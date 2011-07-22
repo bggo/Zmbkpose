@@ -1,0 +1,22 @@
+zmbkpose (0.3)
+	* Fix changelog TRYING to follow RFC 2822 and RFC 5322
+	* Publishing on github
+	* Re-Write README
+
+-- Bruno Gurgel <bruno.gurgel@gmail.com> Thu, 21 07 2010 23:37:33 -0300
+
+zmbkpose (0.2)
+	* addedd backup_todas_contas_parallel()
+	* PARALLEL_SUPPORT and MAX_PARALLEL_PROCESS to conffile
+
+-- Bruno Gurgel <bruno.gurgel@gmail.com>
+-- Alan Milani <niki.milani@gmail.com> Tue, 26 10 2010 17:35:14 -0300
+
+
+zmbkpose (0.1) 
+	* Origial version created
+
+-- Rubens Alonso <rubens@harv.com.br> Tue, 15 12 2009 13:55:04 -0300
+
+
+
