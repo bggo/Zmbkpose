@@ -1,0 +1,62 @@
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+############################# Zmbkpose ################################
+
+The zmbkpose tool is a shell script that does hot backup and hot restore of ZCS
+ Opensource accounts, GPL(OPENSOURCE). It can run from any host in the net, 
+which means that it can be set on a backup server already existent.
+
+It was concepted after Zimbra released ZCS 5.0.12, where a new import/export 
+feature was exposed to user can be able to do his archiving. From that point 
+it was clear for me that I just need to write a code to automatically get all
+ user data from server, remotely via HTTP SOAP. Plus LDAP data. So, it is 
+possible to run full backups and restore even deleted accounts.
+
+Till now, zmbkpose provides
+
+    Full backup of all accounts;
+    Full backup of any account;
+    Incremental backup of all accounts;
+    Incremental backup of any account;
+    Lists all backup sessions done;
+    Restore all contents (mail, contacts, appointments...) to any account;
+    Restore deleted accounts back to directory and all of its contents;
+    Restore only account attributes, like password, class of service;
+    Configurable full simultaneously backup; 
+
+This tool DOES NOT DO disaster recovery. 
+
+
+### History
+Created
+			By Rubens Alonso Filho
+				<rubens@harv.com.br>
+				<rubens@4linux.com.br>
+
+Upgrated
+26/10/2010 - Version 1.0.5
+			By Alan Nikitiuk Milani
+				<alan.milani@4linux.com.br>
+				<niki.milani@gmail.com>
+			By Bruno Gurgel
+				<bruno@4linux.com.br>
+				<bruno.gurgel@gmail.com>
+Published
+			By Bruno Gurgel
+				<bruno.gurgel@gmail.com>
+			 
+#######################################################################
+
+************For installation instructions please read the INSTALL file.
