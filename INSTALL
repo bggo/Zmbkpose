@@ -1,0 +1,19 @@
+############## Install instructions#####################
+
+To install zmbkpose just run the install.sh script.
+
+# chmod +x install.sh
+# ./install.sh
+
+Check the man pages about the zmbpkose or run:
+
+# zmbpkose --help
+
+to get some help.
+
+To execute zmbkpose properly, don't forget you need 
+be loged as zimbra.
+
+########################################################
+
+
