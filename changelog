@@ -1,3 +1,11 @@
+zmbkpose (0.4)
+	* Add the original source code
+	* Add the original conf file
+	* Add COPYING
+
+-- Bruno Gurgel <bruno.gurgel@gmail.com> Mon, 25 07 2010 09:35:44 -0300
+
+
 zmbkpose (0.3)
 	* Fix changelog TRYING to follow RFC 2822 and RFC 5322
 	* Publishing on github
