@@ -407,7 +407,7 @@ else
 fi
 
 if [ -z "$ADMINUSER" ]; then
-        echo "Você precissssssa definir a variável ADMINUSER"
+        echo "Você precisa definir a variável ADMINUSER"
         exit 0
 fi
 
