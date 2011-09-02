@@ -31,6 +31,45 @@
 #
 #
 
+show_help ()
+{
+echo "Usage: 
+     zmbkpose -f 	
+			Execute full backup, all accounts.
+     zmbkpose -f mail1,mail2,...,mailn
+			Execute backup full for specific accounts.
+     zmbkpose -i 	
+			Execute a full incremental backup all accounts.
+			Needs a least one full backup of all account complete.
+     zmbkpose -i mail1,mail2,...,mailn	
+			Execute a incremental backup in specified accounts provided in the command line.
+			If the account doesn't have a previosly full backup, will be done in the same session.
+     zmbkpose -l
+			List backup sessions already done.
+     zmbkpose -r mail1,mail2,...,mailn nome_da_sessao	
+			Restore content from accounts specified by command line.
+			If yout dont provide the name session will be run a full restore: All Backup found, from the oldest to the newer.
+     zmbkpose -restoreAccount mail1,mail2,...,mailn
+			Restore accounts removed from the older backup to the newer.
+     zmbkpose -restoreAccount mail1,mail2,...,mailn --LDAPOnly nome_da_sessao
+			Restore only the user profile, including password.
+			TIP: Could be necesery update the server cache to apply restored attributes.
+			      zmprov fc account nome_da_conta
+     zmbkpose -d n
+			Where \"n\" is a number.
+			Exclude all backup before <number> days.
+     zmbkpose -d n weeks
+			Where \"n\" is a number.
+			Exclude all backup before <number> weeks.
+     zmbkpose -d n months
+			Onde \"n\" é um número.
+			Exclude all backup before <number> of months.
+
+"
+# Deixar uma opção de "Disaster Recovery" oculta + confirmações
+exit 0 
+}
+
 
 exibe_help ()
 {
@@ -382,57 +421,57 @@ rm $WORKDIR/.sessions.txt -f
 exit 0
 }
 
-
-# Carregar e criticar o arquivo de configuração
+###### MAIN ############
+# Here the code loads the config file
 source /etc/zmbkpose/zmbkpose.conf
 
 if ! [ -z "$BACKUPUSER" ]; then
 	if [ "$(id -u)" != "$(id -u $BACKUPUSER)" ]; then
-		echo "É preciso ser $BACKUPUSER para executar este script"
+		echo "You need to be $BACKUPUSER to run this script"
 		exit 0
 	fi
 else
-	echo "Você precisa definir a variável BACKUPUSER"
+	echo "You need to define the variable BACKUPUSER"
 	exit 0
 fi
 
 if ! [ -z "$WORKDIR" ]; then
         if ! [ -d "$WORKDIR" ]; then
-                echo "O diretório $WORKDIR não existe"
+                echo "The directory $WORKDIR doesn't exist"
                 exit 0
         fi
 else
-        echo "Você precisa definir a variável WORKDIR"
+        echo "You need to define the variable WORKDIR"
         exit 0
 fi
 
 if [ -z "$ADMINUSER" ]; then
-        echo "Você precisa definir a variável ADMINUSER"
+        echo "You need to define the variable ADMINUSER"
         exit 0
 fi
 
 if [ -z "$ADMINPASS" ]; then
-        echo "Você precisa definir a variável ADMINPASS"
+        echo "You need to define the variable ADMINPASS"
         exit 0
 fi
 
 if [ -z "$LDAPMASTERSERVER" ]; then
-        echo "Você precisa definir a variável LDAPMASTERSERVER"
+        echo "You need to define the variable LDAPMASTERSERVER"
         exit 0
 fi
 
 if [ -z "$LDAPZIMBRADN" ]; then
-        echo "Você precisa definir a variável LDAPZIMBRADN"
+        echo "You need to define the variable LDAPZIMBRADN"
         exit 0
 fi
 
 if [ -z "$LDAPZIMBRAPASS" ]; then
-        echo "Você precisa definir a variável LDAPZIMBRAPASS"
+        echo "You need to define the variable LDAPZIMBRAPASS"
         exit 0
 fi
 
 if [ -z "$LOGFILE" ]; then
-        echo "Você precisa definir a variável LOGFILE"
+        echo "You need to define the variable LOGFILE"
         exit 0
 fi
 
@@ -441,7 +480,7 @@ fi
 case "$1" in
 "-f" )
 	if [ $PARALLEL_SUPPORT -eq 1  ];then
-			echo "Executando backup Paralelo"
+			echo "Running the parallel backup"
 			backup_todas_contas_parallel
 		else
 			if [ -z "$2" ]; then
@@ -450,8 +489,8 @@ case "$1" in
 				if [ -z "$3" ]; then
 					backup_contas $2
 				fi
-				echo "Parâmetros $@ incorretos. Reveja o help."
-       		 		exibe_help
+				echo "Incorrect $@ params. Read --help."
+       		 		show_help
 		fi
 	fi
 ;;
@@ -462,35 +501,35 @@ case "$1" in
 		if [ -z "$3" ]; then
 			incremental_contas $2
 		fi
-		echo "Parâmetros $@ incorretos. Reveja o help."
-        	exibe_help
+		echo "Incorrect $@ params. Read the --help."
+        	show_help
 	fi
 ;;
 "-l" )
         if [ -z "$2" ]; then
                 lista_sessoes
 	else
-                echo "Parâmetros $@ incorretos. Reveja o help."
-                exibe_help
+                echo "Incorrect $@ params. Read the --help."
+                show_help
 	fi
 ;;
 "-r" )
         if [ -z "$2" ]; then
-                echo "Parâmetros $@ incorretos. Reveja o help."
-                exibe_help
+                echo "Incorrect $@ params. Read the --help."
+                show_help
 	else
 		if [ -z "$4" ]; then
 			restaura_contas $2 $3
 		else
-                	echo "Parâmetros $@ incorretos. Reveja o help."
-	                exibe_help
+                	echo "Incorrect $@ params. Read the --help."
+	                show_help
 		fi
 	fi
 ;;
 "-restoreAccount" )
         if [ -z "$2" ]; then
-                echo "Parâmetros $@ incorretos. Reveja o help."
-                exibe_help
+                echo "Incorrect $@ params. Read the --help."
+                show_help
 	else
 		if [ -z "$3" ]; then
 			restaura_LDAP_conteudo $2
@@ -498,8 +537,8 @@ case "$1" in
 			if [ "$3" = "--LDAPOnly" ]; then
 				restaura_LDAP_conteudo $2 $4
 			else
-	                	echo "Parâmetros $@ incorretos. Reveja o help."
-		                exibe_help
+	                	echo "Incorrect $@ params. Read the --help."
+		                show_help
 			fi
 		fi
 	fi
@@ -507,8 +546,8 @@ case "$1" in
 ;;
 "--DeusMeAjude" )
 	if ! [ -z "$2" ]; then
-	        echo "Parâmetros $@ incorretos. Reveja o help."
-        	exibe_help
+	        echo "Incorrect $@ params. Read the --help."
+        	show_help
 	else
 		DeusMeAjude
 	fi
@@ -516,7 +555,7 @@ case "$1" in
 "-d" )
 	if [ -z "$2" ]; then
 	        echo "O parametro -d aceita apenas um número de dias, ou um número seguido dos complementos weeks para semanas ou months para meses"
-		exibe_help
+		show_help
 		exit 0
 	fi
 	if [ $2 -eq $2 2> /dev/null ]; then
@@ -532,7 +571,7 @@ case "$1" in
 			;;
 			* )
 		          echo "O parametro -d aceita apenas um número de dias, ou um número seguido dos complementos weeks para semanas ou months para meses"
-         		  exibe_help
+         		  show_help
 			  exit 0
 			;;
 			esac
@@ -540,14 +579,14 @@ case "$1" in
 		rotate_backup $OLDEST
 	else
 	        echo "O parametro -d aceita apenas um número de dias, ou um número seguido dos complementos weeks para semanas ou months para meses"
-		exibe_help
+		show_help
 		exit 0
 	fi
 ;;
 
 * )
 	echo "Parâmetros $@ incorretos. Reveja o help."
-	exibe_help
+	show_help
 ;;
 esac
 exit 0
