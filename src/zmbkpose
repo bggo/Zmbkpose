@@ -66,7 +66,7 @@ echo "Usage:
 			Exclude all backup before <number> of months.
 
 "
-# Deixar uma opção de "Disaster Recovery" oculta + confirmações
+# TODO Implements a hidden "Disaster Recovery" option + confirmations
 exit 0 
 }
 
@@ -106,123 +106,123 @@ echo "Usos:
 			Exclui todos os backups anteriores a quantidade de meses especificada na linha de comandos.
 
 "
-# Deixar uma opção de "Disaster Recovery" oculta + confirmações
+# TODO: Deixar uma opção de "Disaster Recovery" oculta + confirmações
 exit 0
 }
 
-backup_todas_contas_parallel()
+backup_all_accounts_parallel()
 {
 COUNT=0
-LISTATODASCONTAS=$(mktemp)
-$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTATODASCONTAS"
+LISTALLACCOUNTS=$(mktemp)
+$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTALLACCOUNTS"
 SESSAO="full-"$(date  +%Y%m%d%H%M%S)
-echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
+echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
 TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-for MAIL in $(grep @ $LISTATODASCONTAS); do 
+for MAIL in $(grep @ $LISTALLACCOUNTS); do 
 	
-	# Contador de processos curl simultaneos
+	# Simultaneous Curl Process counter
 	STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 	
 	if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then	
-		MAILHOST=$(grep -A1 ^$MAIL $LISTATODASCONTAS| grep -v @)
+		MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 		$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 		$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-		echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+		echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 		let COUNT++
         else
 		until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
                 do
                         STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 			sleep 5
-                        #echo "Número máximo de processos atingido ($STAT). Aguardando vaga."
+                        #echo "Max process number reached ($STAT). Waiting slot."
                 done
-		# Bloco de execução
-		MAILHOST=$(grep -A1 ^$MAIL $LISTATODASCONTAS| grep -v @)
+		# Execution block
+		MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
                 $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
                 $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-                echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 		let COUNT++
-		# Fim Bloco de execução               
+		# End execution block               
                 
 	fi
 
 
 
 done
-mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
+mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
+echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
 
-echo "$(date) - Efetuados backup de $COUNT conta(s)" >> $LOGFILE
+echo "$(date) - Backup completed for $COUNT account(s)" >> $LOGFILE
 
 exit 0
 }
 
-backup_todas_contas ()
+backup_all_accounts ()
 {
-LISTATODASCONTAS=$(mktemp)
-$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTATODASCONTAS"
-SESSAO="full-"$(date  +%Y%m%d%H%M%S)
-echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
+LISTALLACCOUNTS=$(mktemp)
+$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTALLACCOUNTS"
+SESSION="full-"$(date  +%Y%m%d%H%M%S)
+echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
 TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-for MAIL in $(grep @ $LISTATODASCONTAS); do 
-	MAILHOST=$(grep -A1 ^$MAIL $LISTATODASCONTAS| grep -v @)
+for MAIL in $(grep @ $LISTALLACCOUNTS); do 
+	MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+	echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 done
-mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
+mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
+echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
 exit 0
 }
 
-incremental_todas_contas ()
+incremental_all_accounts ()
 {
-FULLSESSIONLABEL=$(grep "SESSAO: full-" $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
+FULLSESSIONLABEL=$(grep "SESSION: full-" $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
 if ! [ -z "$FULLSESSIONLABEL" ]; then
         if ! [ -d "$WORKDIR/$FULLSESSIONLABEL" ]; then
-                echo "O diretório $WORKDIR/$FULLSESSIONLABEL não existe. Impossível prosseguir."
+                echo "Directory $WORKDIR/$FULLSESSIONLABEL doesn't exist. Impossible to continue."
                 exit 0
         fi
 else
-	echo "Nenhum backup completo encontrado. Impossível prosseguir."
+	echo "No full backup found. Impossible to continue."
 	exit 0
 fi
 INCFROM=$(grep INCFROM: $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
-LISTATODASCONTAS=$(mktemp)
-$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTATODASCONTAS"
-SESSAO="inc"-$(date  +%Y%m%d%H%M%S)
-echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
+LISTALLACCOUNTS=$(mktemp)
+$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTALLACCOUNTS"
+SESSION="inc"-$(date  +%Y%m%d%H%M%S)
+echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
 TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-for MAIL in $(grep @ $LISTATODASCONTAS); do 
-	EXISTEFULL=""
-	EXISTEFULL=$(grep $MAIL $WORKDIR/sessions.txt | grep ^full)
-        if [ -z "$EXISTEFULL" ]; then
-        	echo " $MAIL não tinha backup full anterior. Executando agora..."
-                backup_contas $MAIL
+for MAIL in $(grep @ $LISTALLACCOUNTS); do 
+	FULLEXISTS=""
+	FULLEXISTS=$(grep $MAIL $WORKDIR/sessions.txt | grep ^full)
+        if [ -z "$FULLEXISTS" ]; then
+        	echo " $MAIL doesn't have previos full backup. Executing now..."
+                backup_accounts $MAIL
         else
 		INCFROM=$(grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN | tail -1 | awk -F: '{print $3}')
 		if [ "$INCFROM" = "$(date +%m/%d/%y)" ]; then
-			echo "WARN: $MAIL já foi becapeada hoje. Nada a fazer." | tee -a $WORKDIR/sessions.txt
+			echo "WARN: $MAIL already has backup today. Nothing to do." | tee -a $WORKDIR/sessions.txt
 		else
-			MAILHOST=$(grep -A1 ^$MAIL $LISTATODASCONTAS| grep -v @)
+			MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 			$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
 # "
-			echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+			echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 		fi
 	fi
 done
-mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
+mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
+echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
 exit 0
 }
 
-backup_contas ()
+backup_accounts ()
 {
-	SUBSESSAO="$SESSAO"
+	SUBSESSION="$SESSION"
 	SUBTEMP=$TEMPDIR
-	SESSAO="full-"$(date  +%Y%m%d%H%M%S)
-	echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
+	SESSION="full-"$(date  +%Y%m%d%H%M%S)
+	echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
 	TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
 K=1
 while true; do
@@ -233,28 +233,28 @@ while true; do
 	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
 	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+	echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	((K = K+1))
 	unset MAIL
 	sleep 1
 done
-#if [ -z "$SUBSESSAO" ]; then
-#	mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-#	echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
+#if [ -z "$SUBSESSION" ]; then
+#	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
+#	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
 #	exit 0
 #else
-#	SESSAO="$SUBSESSAO"
+#	SESSION="$SUBSESSION"
 #fi
-	mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-	echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
-	SESSAO="$SUBSESSAO"
+	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
+	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
+	SESSION="$SUBSESSION"
 	TEMPDIR="$SUBTEMP"
 }
 
-incremental_contas ()
+incremental_accounts ()
 {
-SESSAO="inc-"$(date  +%Y%m%d%H%M%S)
-echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
+SESSION="inc-"$(date  +%Y%m%d%H%M%S)
+echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
 TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
 K=1
 while true; do
@@ -262,71 +262,71 @@ while true; do
 	if [ -z $MAIL ]; then
 		break
 	else
-		EXISTEFULL=""
-		EXISTEFULL=$(grep $MAIL $WORKDIR/sessions.txt | grep ^full)
-		if [ -z "$EXISTEFULL" ]; then
-			echo " $MAIL não tinha backup full anterior. Executando agora..."
-			backup_contas $MAIL
+		FULLEXISTS=""
+		FULLEXISTS=$(grep $MAIL $WORKDIR/sessions.txt | grep ^full)
+		if [ -z "$FULLEXISTS" ]; then
+        	echo " $MAIL doesn't have previos full backup. Executing now..."
+			backup_accounts $MAIL
 			((K = K+1))
 		else
 			$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 			INCFROM=$(grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN | tail -1 | awk -F: '{print $3}')
 			if [ "$INCFROM" = "$(date +%m/%d/%y)" ]; then
-				echo "WARN:  $MAIL já foi becapeada hoje. Nada a fazer." | tee -a $WORKDIR/sessions.txt
+    			echo "WARN: $MAIL already has backup today. Nothing to do." | tee -a $WORKDIR/sessions.txt
 				((K = K+1))
 			else
 				MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
 				$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
 # "
-				echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+				echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 				((K = K+1))
 			fi
 		fi
 	fi
 	unset MAIL
 done
-mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
+mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
+echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
 exit 0
 }
 
-lista_sessoes ()
+list_sessions ()
 {
-grep SESSAO: $WORKDIR/sessions.txt| grep iniciada | awk '{print $2}'
+grep SESSION: $WORKDIR/sessions.txt| grep iniciada | awk '{print $2}'
 exit 0
 }
 
-restaura_contas ()
+restore_accounts ()
 {
-BKPSCONTA=$(mktemp)
+BKPSACCOUNT=$(mktemp)
 K=1
 while true; do
         MAIL=$(echo $1, | cut -d, -f$K)
         if [ -z $MAIL ]; then
                 break
         fi
-	grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN: > $BKPSCONTA
-	if ! [ -s $BKPSCONTA ]; then
-		echo "$MAIL: Nenhum backup encontrado. Impossível restaurar"
+	grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN: > $BKPSACCOUNT
+	if ! [ -s $BKPSACCOUNT ]; then
+		echo "$MAIL: No backup found. Impossible to restor"
 		((K = K+1))
 	else
 		if [ -z $2 ]; then
-		echo "Nao implementada."
-		# Restauração completa
+		echo "Not implemented."
+		# Restore completed
 		((K = K+1))
 		else
-			SESSAOCONTA=$(grep $2 $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
-			if [ -z $SESSAOCONTA ]; then
-				echo "$MAIL: A sessão $2 não existe. Impossível continuar..."
+			SESSIONACCOUNT=$(grep $2 $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
+			if [ -z $SESSIONACCOUNT ]; then
+				echo "$MAIL: Session $2 doesn't exist. Impossible to continue."
 				break
 			else
-				CONTANASESSAO=$(grep $MAIL $BKPSCONTA | grep $SESSAOCONTA)
-				if [ -z $CONTANASESSAO ]; then
-					echo "$MAIL não foi encontrada na sessão $SESSAOCONTA. Impossível restaurar."
+				CONTANASESSION=$(grep $MAIL $BKPSACCOUNT | grep $SESSIONACCOUNT)
+				if [ -z $CONTANASESSION ]; then
+					echo "$MAIL not found in session $SESSIONACCOUNT. Impossible to restore."
         				((K = K+1))
 				else
-					MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSAOCONTA/$MAIL.ldiff | awk '{print $2}')
-        				$(which curl) -k --data-binary @$WORKDIR/$SESSAOCONTA/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
+					MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
+        				$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
         				((K = K+1))
 				        unset MAIL
 				fi
@@ -336,9 +336,9 @@ while true; do
 done
 exit 0
 }
-restaura_LDAP_conteudo ()
+restore_LDAP_account ()
 {
-BKPSCONTA=$(mktemp)
+BKPSACCOUNT=$(mktemp)
 K=1
 while true; do
         MAIL=$(echo $1, | cut -d, -f$K)
@@ -348,38 +348,38 @@ while true; do
 	if [ -z $2 ]; then
 		EXISTE=$($(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(&(objectclass=zimbraAccount)(zimbraMailDeliveryAddress=$MAIL))" uid)
 		if ! [ -z "$EXISTE" ]; then
-			echo "A conta $MAIL existe. Utilize zmbkpose -r $MAIL nome_da_sessao."
+			echo "Account $MAIL exists. Use zmbkpose -r $MAIL SESSION_name."
 			((K = K+1))
 		else
-		       	grep $MAIL $WORKDIR/sessions.txt | grep -e ^inc- -e ^full- > $BKPSCONTA
-		        if ! [ -s $BKPSCONTA ]; then
-        		        echo "$MAIL: Nenhum backup encontrado. Impossível restaurar"
+		       	grep $MAIL $WORKDIR/sessions.txt | grep -e ^inc- -e ^full- > $BKPSACCOUNT
+		        if ! [ -s $BKPSACCOUNT ]; then
+        		        echo "$MAIL: No backup found. Impossible to restore."
                 		((K = K+1))
 		        else
-				echo "Sessões encontradas
-$(cat $BKPSCONTA | awk -F: '{print $1}')"
-				for SESSAOCONTA in $(cat $BKPSCONTA | awk -F: '{print $1}'); do
-					echo "Restaurando a partir de $SESSAOCONTA"
-		                	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSAOCONTA/$MAIL.ldiff | awk '{print $2}')
-					$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $(grep ^dn: $WORKDIR/$SESSAOCONTA/$MAIL.ldiff | awk '{print $2}') 2>/dev/null
-					$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff
-        	        	        $(which curl) -k --data-binary @$WORKDIR/$SESSAOCONTA/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-					echo "$MAIL restaurado a partir de $SESSAOCONTA"
+				echo "Sessions found
+$(cat $BKPSACCOUNT | awk -F: '{print $1}')"
+				for SESSIONACCOUNT in $(cat $BKPSACCOUNT | awk -F: '{print $1}'); do
+					echo "Restaurando a partir de $SESSIONACCOUNT"
+		                	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
+					$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}') 2>/dev/null
+					$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
+        	        	        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
+					echo "$MAIL restaurado a partir de $SESSIONACCOUNT"
 				done
 	        	        ((K = K+1))
         	        	unset MAIL
 			fi
 		fi
 	else
-		SESSAOCONTA=$(grep $2 $WORKDIR/sessions.txt | grep $MAIL | tail -1 | awk -F: '{print $1}')
-	        if [ -z $SESSAOCONTA ]; then
-                	echo "$MAIL: A sessão $2 não existe ou a conta não está presente. Impossível restaurar..."
+		SESSIONACCOUNT=$(grep $2 $WORKDIR/sessions.txt | grep $MAIL | tail -1 | awk -F: '{print $1}')
+	        if [ -z $SESSIONACCOUNT ]; then
+                	echo "$MAIL: Sessiono $2 doesn't exist or account not present. Impossible to restore."
         	        ((K = K+1))
                 else
-			USERDN=$(grep ^dn: $WORKDIR/$SESSAOCONTA/$MAIL.ldiff | awk '{print $2}')
+			USERDN=$(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
 			$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN
-			$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff
-			echo "Perfil e configurações do usuário restaurados para $SESSAOCONTA"
+			$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
+			echo "User's profile and configurations restored to $SESSIONACCOUNT"
         	        ((K = K+1))
        	        	unset MAIL
 		fi
@@ -391,15 +391,15 @@ exit 0
 DeusMeAjude ()
 {
 for BKP in $(grep -e ^full- -e ^inc- $WORKDIR/sessions.txt); do
-	SESSAOCONTA=$(echo $BKP | awk -F: '{print $1}')
+	SESSIONACCOUNT=$(echo $BKP | awk -F: '{print $1}')
 	MAIL=$(echo $BKP | awk -F: '{print $2}')
-	USERDN=$(grep ^dn: $WORKDIR/$SESSAOCONTA/$MAIL.ldiff | awk '{print $2}')
-	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSAOCONTA/$MAIL.ldiff | awk '{print $2}')
-	echo "Restaurando $MAIL"
+	USERDN=$(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
+	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
+	echo "Restoring $MAIL"
 	$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN 2>/dev/null
-	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff
-	$(which curl) -k --data-binary @$WORKDIR/$SESSAOCONTA/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-	echo "$MAIL restaurado"
+	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
+	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
+	echo "$MAIL restored"
 done
 exit 0
 }
@@ -411,7 +411,7 @@ cp $WORKDIR/sessions.txt $WORKDIR/sessions.txt.old
 
 grep SESS $WORKDIR/sessions.txt | awk '{print $2}'| while read line; do
 	if [ "$(echo ${line} | cut -d- -f2)" -lt "$1" ]; then
-	   [ -d $WORKDIR/"${line}" ] && rm -rf $WORKDIR/"${line}" && echo Excluída sessão "${line}"
+	   [ -d $WORKDIR/"${line}" ] && rm -rf $WORKDIR/"${line}" && echo Exclude session "${line}"
 	   grep -v "${line}" $WORKDIR/sessions.txt > $WORKDIR/.sessions.txt
 	   mv $WORKDIR/.sessions.txt $WORKDIR/sessions.txt
 	fi
@@ -475,19 +475,19 @@ if [ -z "$LOGFILE" ]; then
         exit 0
 fi
 
-# Criticar os parametros passados na linha de comando
+# Criticize the parameters passed on the command line
 
 case "$1" in
 "-f" )
 	if [ $PARALLEL_SUPPORT -eq 1  ];then
 			echo "Running the parallel backup"
-			backup_todas_contas_parallel
+			backup_all_accounts_parallel
 		else
 			if [ -z "$2" ]; then
-				backup_todas_contas
+				backup_all_accounts
 			else
 				if [ -z "$3" ]; then
-					backup_contas $2
+					backup_accounts $2
 				fi
 				echo "Incorrect $@ params. Read --help."
        		 		show_help
@@ -496,10 +496,10 @@ case "$1" in
 ;;
 "-i" )
 	if [ -z "$2" ]; then
-		incremental_todas_contas
+		incremental_all_accounts
 	else
 		if [ -z "$3" ]; then
-			incremental_contas $2
+			incremental_accounts $2
 		fi
 		echo "Incorrect $@ params. Read the --help."
         	show_help
@@ -507,7 +507,7 @@ case "$1" in
 ;;
 "-l" )
         if [ -z "$2" ]; then
-                lista_sessoes
+                list_sessions
 	else
                 echo "Incorrect $@ params. Read the --help."
                 show_help
@@ -519,7 +519,7 @@ case "$1" in
                 show_help
 	else
 		if [ -z "$4" ]; then
-			restaura_contas $2 $3
+			restore_accounts $2 $3
 		else
                 	echo "Incorrect $@ params. Read the --help."
 	                show_help
@@ -532,10 +532,10 @@ case "$1" in
                 show_help
 	else
 		if [ -z "$3" ]; then
-			restaura_LDAP_conteudo $2
+			restore_LDAP_account $2
 		else
 			if [ "$3" = "--LDAPOnly" ]; then
-				restaura_LDAP_conteudo $2 $4
+				restore_LDAP_account $2 $4
 			else
 	                	echo "Incorrect $@ params. Read the --help."
 		                show_help
@@ -554,7 +554,7 @@ case "$1" in
 ;;
 "-d" )
 	if [ -z "$2" ]; then
-	        echo "O parametro -d aceita apenas um número de dias, ou um número seguido dos complementos weeks para semanas ou months para meses"
+	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
 		show_help
 		exit 0
 	fi
@@ -570,7 +570,7 @@ case "$1" in
 			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 months"`
 			;;
 			* )
-		          echo "O parametro -d aceita apenas um número de dias, ou um número seguido dos complementos weeks para semanas ou months para meses"
+		          echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
          		  show_help
 			  exit 0
 			;;
@@ -578,14 +578,14 @@ case "$1" in
 		fi
 		rotate_backup $OLDEST
 	else
-	        echo "O parametro -d aceita apenas um número de dias, ou um número seguido dos complementos weeks para semanas ou months para meses"
+	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
 		show_help
 		exit 0
 	fi
 ;;
 
 * )
-	echo "Parâmetros $@ incorretos. Reveja o help."
+	echo "Incorrect parameters $@. See help."
 	show_help
 ;;
 esac
@@ -607,4 +607,4 @@ exit 0
 
 # Restore FULL de todas as contas (PEDIR CONFIRMAÇÕES. ALTÍSSIMO RISCO.)
 
-# Exclui a sessao especificada na linha de comandos (para administração da janela de retencao)
+# Exclui a SESSION especificada na linha de comandos (para administração da janela de retencao)
