@@ -56,6 +56,30 @@ Upgrated
 Published
 			By Bruno Gurgel
 				<bruno.gurgel@gmail.com>
+
+Upgraded
+24/05/2012 - Version 2.0 Beta 
+			By William Felipe Welter
+                                <william.welter@4linux.com.br>
+                                <wfelipew@gmail.com>
+	-Added functions:  
+	backup_distribution_list()
+	restore_distribution_list()
+	backup_alias()
+	restore_alias()
+	backup_accounts_parallel()  (backup specific accounts parallel)
+
+	-Modified: 
+	backup_all_accounts_parallel()  (added backup trash and junk folders)
+	incremental_all_accounts()  (doesnt create another full directory if new accounts are created after the last full backup)
+
+	-Renamed: 
+	DeusMeAjude -> restore_all_accounts()  (Restore all accounts parallel)
+
+
+	-Bug corrections:  
+	Wrong variables names references after translate to english
+
 			 
 #######################################################################
 
