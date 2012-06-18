@@ -667,6 +667,27 @@ restore_distribution_list()
         done
 }
 
+backup_alias()
+{
+COUNT=0
+LISTATODASCONTAS=$(mktemp)
+$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAlias)" uid | grep ^uid | awk '{print $2}' > "$LISTATODASCONTAS"
+SESSAO="alias-"$(date  +%Y%m%d%H%M%S)
+echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
+TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
+for MAIL in $(cat $LISTATODASCONTAS); do
+        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(&(uid=$MAIL)(objectclass=zimbraAlias))" > $TEMPDIR/$MAIL.ldiff
+	echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
+        let COUNT++
+done
+mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
+echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
+
+echo "$(date) - Efetuados backup de $COUNT conta(s)" >> $LOGFILE
+
+exit 0
+
+}
 
 
 ####Ate aqui merged
@@ -811,7 +832,7 @@ case "$1" in
 	fi
 	
 ;;
-"--retoreAllAccounts" )
+"--restoreAllAccounts" )
 	restore_all_accounts_parallel
 ;;
 "--backupDistributionList" )
