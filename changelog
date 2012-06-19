@@ -1,3 +1,24 @@
+zmbkpose (2.0)
+	* Added functions:  
+	backup_distribution_list()
+	restore_distribution_list()
+	backup_alias()
+	restore_alias()
+	backup_accounts_parallel()  (backup specific accounts parallel)
+
+	* Modified functions: 
+	backup_all_accounts_parallel()  (added backup trash and junk folders)
+	incremental_all_accounts()  (doesnt create another full directory if new accounts are created after the last full backup)
+
+	* Renamed functions: 
+	DeusMeAjude -> restore_all_accounts()  (Restore all accounts parallel)
+
+	* Bug corrections:  
+	Wrong variables names references after translate to english.
+
+-- William Felipe Welter <william.welter@4linux.com.br> Mon, 18 06 2012 00:00:00 -0300
+
+
 zmbkpose (0.5)
 	* Add a simple install script
 	* Add a simple INSTALL note
