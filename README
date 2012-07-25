@@ -87,6 +87,9 @@ Upgraded
 				<diego@diegolima.org>
 	- New installer script
 
+	- Modified:
+	zmbkpose.conf now uses paralel backup capability by default
+
 			 
 #######################################################################
 

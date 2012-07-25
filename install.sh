@@ -4,9 +4,10 @@
 # the script's dependencies are present.
 #
 # LIMITATIONS: For now this script does NOT customize the zmbkpose config file.
-# As such you MUST configure it manually after the install finishes. Also
-# it assumes you're doing a local install. These should be fixed on a
-# future version of this script.
+# As such you MUST configure it manually after the install finishes. 
+# It also assumes you're doing a local install and requires the user zimbra to exist
+# on your server. While not strictly necessary this is enforced due to the way
+# the current zmbkpose script works.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
