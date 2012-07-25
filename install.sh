@@ -3,11 +3,9 @@
 # This script installs zmbkpose on a ZCS server. It also makes sure
 # the script's dependencies are present.
 #
-# LIMITATIONS: For now this script does NOT customize the zmbkpose config file.
-# As such you MUST configure it manually after the install finishes. 
-# It also assumes you're doing a local install and requires the user zimbra to exist
-# on your server. While not strictly necessary this is enforced due to the way
-# the current zmbkpose script works.
+# LIMITATIONS: This script assumes you're doing a local install and requires the 
+# user zimbra to exist on your server. While not strictly necessary this is 
+# enforced due to the way the current zmbkpose script works.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,18 +30,46 @@ OSE_CONF="/etc/zmbkpose"
 # settings
 ZIMBRA_USER="zimbra"
 ZIMBRA_DIR="/opt/zimbra"
+ZIMBRA_BKPDIR=""		# Leave empty to autodetect
+ZIMBRA_HOSTNAME=""		# Leave empty to autodetect
+ZIMBRA_ADDRESS=""		# Leave empty to autodetect
+ZIMBRA_LDAPPASS=""		# Leave empty to autodetect
+
 
 # Exit codes
 ERR_OK="0"			# No error (normal exit)
+ERR_NOBKPDIR="1"		# No backup directory could be found
 ERR_NOROOT="2"			# Script was run without root privileges
 ERR_DEPNOTFOUND="3"		# Missing dependency
 
+# Try to guess missing settings as best as we can
+test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - zimbra -c zmhostname`
+test -z $ZIMBRA_ADDRESS  && ZIMBRA_ADDRESS=`grep $ZIMBRA_HOSTNAME /etc/hosts|awk '{print $1}'`
+test -z $ZIMBRA_LDAPPASS && ZIMBRA_LDAPPASS=`su - zimbra -c "zmlocalconfig -s zimbra_ldap_password"|awk '{print $3}'`
+if [ -z $ZIMBRA_BKPDIR ]; then
+	test -d $ZIMBRA_DIR/backup && ZIMBRA_BKPDIR=$ZIMBRA_DIR/backup
+	test -d /backup && ZIMBRA_BKPDIR=/backup
+	test -d /opt/backup && ZIMBRA_BKPDIR=/opt/backup
+fi
+
+if [ -z $ZIMBRA_BKPDIR ]; then
+	echo "No backup directory could be found! Please edit this script and declare it manually."
+	exit $ERR_NOBKPDIR
+fi
+
 clear
 echo "This will install zmbkpose, a script aimed at creating backups for ZCS Community Edition."
+read -p "What is the password for Zimbra's \"admin\" user? " ZIMBRA_ADMPASS
 echo ""
-echo "The installer will assume the following conditions are true:"
+echo "Here is a Summary of your settings:"
+echo ""
 echo "Zimbra User: $ZIMBRA_USER"
+echo "Zimbra Hostname: $ZIMBRA_HOSTNAME"
+echo "Zimbra IP Address: $ZIMBRA_ADDRESS"
+echo "Zimbra LDAP Password: $ZIMBRA_LDAPPASS"
+echo "Zimbra Admin Password: $ZIMBRA_ADMPASS"
 echo "Zimbra Install Directory: $ZIMBRA_DIR"
+echo "Zimbra Backup Directory: $ZIMBRA_BKPDIR"
 echo "Zmbkpose Install Directory: $OSE_SRC"
 echo "Zmbkpose Settings Directory: $OSE_CONF"
 echo ""
@@ -150,9 +176,19 @@ test -d $OSE_CONF || mkdir -p $OSE_CONF
 test -d $OSE_SRC  || mkdir -p $OSE_SRC
 
 # Copy files
-install -o $ZIMBRA_USER -m 755 $MYDIR/src/zmbkpose $OSE_SRC
-install --backup=numbered -o $ZIMBRA_USER -m 644 $MYDIR/etc/zmbkpose.conf $OSE_CONF
+install -o $ZIMBRA_USER -m 700 $MYDIR/src/zmbkpose $OSE_SRC
+install --backup=numbered -o $ZIMBRA_USER -m 600 $MYDIR/etc/zmbkpose.conf $OSE_CONF
 
+# Add custom settings
+sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_BKPDIR}/$ZIMBRA_BKPDIR/g"
+sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_ADDRESS}/$ZIMBRA_ADDRESS/g"
+sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_ADMINPASS}/$ZIMBRA_ADMPASS/g"
+sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_LDAPPASS}/$ZIMBRA_LDAPPASS/g"
+
+# Fix backup dir permissions (owner MUST be $ZIMBRA_USER)
+chown $ZIMBRA_USER $ZIMBRA_BKPDIR
+
+# We're done!
 read -p "Install completed. Do you want to display the README file? (Y/n)" tmp
 case "$tmp" in
 	y|Y|Yes|"") less $MYDIR/README
