@@ -19,8 +19,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# v: 0.1a
 
 # Zmbkpose Defaults - Where the script will be placed and look for its settings
 OSE_SRC="/usr/local/bin"
