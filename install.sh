@@ -180,10 +180,10 @@ install -o $ZIMBRA_USER -m 700 $MYDIR/src/zmbkpose $OSE_SRC
 install --backup=numbered -o $ZIMBRA_USER -m 600 $MYDIR/etc/zmbkpose.conf $OSE_CONF
 
 # Add custom settings
-sed -i $OSE_CONF/zmbkpose.conf "s|{ZIMBRA_BKPDIR}|${ZIMBRA_BKPDIR}|g"
-sed -i $OSE_CONF/zmbkpose.conf "s|{ZIMBRA_ADDRESS}|${ZIMBRA_ADDRESS}|g"
-sed -i $OSE_CONF/zmbkpose.conf "s|{ZIMBRA_ADMINPASS}|${ZIMBRA_ADMPASS}|g"
-sed -i $OSE_CONF/zmbkpose.conf "s|{ZIMBRA_LDAPPASS}|${ZIMBRA_LDAPPASS}|g"
+sed -i "s|{ZIMBRA_BKPDIR}|${ZIMBRA_BKPDIR}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_ADDRESS}|${ZIMBRA_ADDRESS}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_ADMINPASS}|${ZIMBRA_ADMPASS}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_LDAPPASS}|${ZIMBRA_LDAPPASS}|g" $OSE_CONF/zmbkpose.conf
 
 # Fix backup dir permissions (owner MUST be $ZIMBRA_USER)
 chown $ZIMBRA_USER $ZIMBRA_BKPDIR
