@@ -19,8 +19,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# v: 0.1a
 
 # Zmbkpose Defaults - Where the script will be placed and look for its settings
 OSE_SRC="/usr/local/bin"
@@ -180,10 +178,10 @@ install -o $ZIMBRA_USER -m 700 $MYDIR/src/zmbkpose $OSE_SRC
 install --backup=numbered -o $ZIMBRA_USER -m 600 $MYDIR/etc/zmbkpose.conf $OSE_CONF
 
 # Add custom settings
-sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_BKPDIR}/$ZIMBRA_BKPDIR/g"
-sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_ADDRESS}/$ZIMBRA_ADDRESS/g"
-sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_ADMINPASS}/$ZIMBRA_ADMPASS/g"
-sed -i $OSE_CONF/zmbkpose.conf "s/{ZIMBRA_LDAPPASS}/$ZIMBRA_LDAPPASS/g"
+sed -i "s|{ZIMBRA_BKPDIR}|${ZIMBRA_BKPDIR}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_ADDRESS}|${ZIMBRA_ADDRESS}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_ADMINPASS}|${ZIMBRA_ADMPASS}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_LDAPPASS}|${ZIMBRA_LDAPPASS}|g" $OSE_CONF/zmbkpose.conf
 
 # Fix backup dir permissions (owner MUST be $ZIMBRA_USER)
 chown $ZIMBRA_USER $ZIMBRA_BKPDIR
@@ -191,8 +189,8 @@ chown $ZIMBRA_USER $ZIMBRA_BKPDIR
 # We're done!
 read -p "Install completed. Do you want to display the README file? (Y/n)" tmp
 case "$tmp" in
-	y|Y|Yes|"") less $MYDIR/README
-	*) echo "Done!"
+	y|Y|Yes|"") less $MYDIR/README;;
+	*) echo "Done!";;
 esac
 
 exit $ERR_OK
