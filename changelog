@@ -1,3 +1,12 @@
+zmbkpose (2.0.rewrite.proposal)
+	* This is a complete rewrite proposal to zmbkpose. main features:
+	  Full rewrite of source code 
+	  Elimination of session log metadata
+	  New storage format for backups, incomppatible with older versions
+	  Conditional incremental or full backup(how old is the last backup)
+	  Restore the account to a specific time
+-- Leandro Santinelli <liandrosg@gmail.com> Fri, 07 09 2012 15:28:39 -0300
+
 zmbkpose (2.0)
 	* Added functions:  
 	backup_distribution_list()

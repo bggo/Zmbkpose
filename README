@@ -15,82 +15,254 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ############################# Zmbkpose ################################
 
 The zmbkpose tool is a shell script that does hot backup and hot restore of ZCS
-Opensource accounts, GPL(OPENSOURCE). It can run from any host in the net, 
+ Opensource accounts, GPL(OPENSOURCE). It can run from any host in the net, 
 which means that it can be set on a backup server already existent.
 
 It was concepted after Zimbra released ZCS 5.0.12, where a new import/export 
 feature was exposed to user can be able to do his archiving. From that point 
 it was clear for me that I just need to write a code to automatically get all
-user data from server, remotely via HTTP SOAP. Plus LDAP data. So, it is 
+ user data from server, remotely via HTTP SOAP. Plus LDAP data. So, it is 
 possible to run full backups and restore even deleted accounts.
 
 Till now, zmbkpose provides
 
-    Full backup of all accounts;
-    Full backup of any account;
-    Incremental backup of all accounts;
-    Incremental backup of any account;
+    Full backup of any or all accounts, or distributions lists ;
+    Incremental backup of any or all accounts;
     Lists all backup sessions done;
     Restore all contents (mail, contacts, appointments...) to any account;
     Restore deleted accounts back to directory and all of its contents;
-    Restore only account attributes, like password, class of service;
-    Configurable full simultaneously backup; 
 
-This tool DOES NOT DO disaster recovery. 
-
-
-### History
-Created
-			By Rubens Alonso Filho
-				<rubens@harv.com.br>
-				<rubens@4linux.com.br>
-
-Upgrated
-26/10/2010 - Version 1.0.5
-			By Alan Nikitiuk Milani
-				<alan.milani@4linux.com.br>
-				<niki.milani@gmail.com>
-			By Bruno Gurgel
-				<bruno@4linux.com.br>
-				<bruno.gurgel@gmail.com>
-Published
-			By Bruno Gurgel
-				<bruno.gurgel@gmail.com>
-
-Upgraded
-24/05/2012 - Version 2.0 Beta 
-			By William Felipe Welter
-                                <william.welter@4linux.com.br>
-                                <wfelipew@gmail.com>
-	-Added functions:  
-	backup_distribution_list()
-	restore_distribution_list()
-	backup_alias()
-	restore_alias()
-	backup_accounts_parallel()  (backup specific accounts parallel)
-
-	-Modified: 
-	backup_all_accounts_parallel()  (added backup trash and junk folders)
-	incremental_all_accounts()  (doesnt create another full directory if new accounts are created after the last full backup)
-
-	-Renamed: 
-	DeusMeAjude -> restore_all_accounts()  (Restore all accounts parallel)
+################################################################################
+################################################################################
+          This tool DOES NOT DO disaster recovery. 
+################################################################################
+################################################################################
 
 
-	-Bug corrections:  
-	Wrong variables names references after translate to english
-
-Upgraded
-25/07/2012 - Version 2.0 Beta 2
-			By Diego Alencar Alves de Lima
-				<diego.lima@4linux.com.br>
-				<diego@diegolima.org>
-	- New installer script
-
-	- Modified:
-	zmbkpose.conf now uses paralel backup capability by default
-
-			 
 #######################################################################
+# For installation instructions please read the INSTALL file.
 
-************For installation instructions please read the INSTALL file.
+#######################################################################
+# About this rewrite job:
+ Zmbkpose is a great project.
+ After using it, I started to need some features that were not available and I 
+  wanted to add.
+
+ By analyzing the code, from my point of view, there is a big problem that 
+  requires a radical change in much of the code: Using a log file as metadata 
+  to access the backups, which means you must hold a synchronization between 
+  backup files, and archive logs. Differences between them would cause a big 
+  problem.
+
+ Use backup files directly, without additional metadata required so many 
+  changes in the code, I was more simple rewrite and incorporate other needs 
+  arising in my organization. Besides trying to make the code more efficient.
+
+ From my point of view rewriting code can be taken as offensive, and selfish. 
+ This was not my intention, and I do not want to step on the original code zmbkpose.
+
+ Zmbkpose programmers: If this code is offensive, please remove it.
+
+ Thanks for giving me a solution to my open source zimbra installation.
+
+#######################################################################
+# Usage:
+
+Index:
+
+  01 - How zmbkpose obtains data for backups?
+  02 - How are backups stored?
+  03 - Which is the backup content?
+  04 - Usage instructions 
+  05 - Usage recommendations 
+  06 - Usage example
+
+
+01 - How zmbkpose obtains data for backups?
+   -----------------------------------------------------------------------------
+   - Using import/export feature released in Zimbra ZCS 5.0.12 version, zmbkpose
+     get backups data via http (using curl) in tar-gzip format as follow:
+
+    $ curl -s -S -k -u $ADMINUSER:$ADMINPASS -o backup_file \
+         "https://$mailhost:7071/home/$account/?fmt=tgz
+
+    zmbkpose uses this form to make full account backups
+
+   - Opcionally you can get a backup with the activity at last 60 minutes as follow:
+    $ curl -s -S -k -u $ADMINUSER:$ADMINPASS -o backup_file \
+         "https://$mailhost:7071/home/$account/?fmt=tgz&query=after:-60mi"
+
+    zmbkpose uses this form to make incremental account backups
+
+   - For details of syntax arguments in query, see docs/soap.txt in your zimbra
+    install directory.
+
+
+02 - How are backups stored?
+   -----------------------------------------------------------------------------
+   - The value of $WORKDIR variable in your /etc/zmbkpose.conf determine the root 
+    directory for backups. 
+   - In the WORKDIR directory, zmbkpose, create a directory for each account that has
+    a bakcup.
+   - In the account directory, the name of backups files are as follow:
+     YYYYMMDDhhmmss:TYPE.tar
+    where:
+      _ YYYY is 4 digit year
+      _ MM is 2 digit month
+      _ DD is 2 digit day
+      _ hh is 2 digit hour
+      _ mm is 2 digit minute
+      _ ss is 2 digit second
+      _ TYPE is FULL for full backup, or INC for incremental backup
+
+   - Inside of the tar file is as follows:
+     acct.ldif   : ldap data
+     mailbox.tgz : mail, contacts, appointments...
+
+
+03 - Which is the backup content?
+   -----------------------------------------------------------------------------
+   Inside of the tar file described in "How are backups stored?" :
+
+   - acct.ldif file, save ldap data for create the account. The data covers:
+      _mailbox tree (mailbox ldap entry and identity entries)
+      _mailbox alias(alias ldap entries)
+ 
+     NOTE: when zmbkpose restores ldap entries, it add only the missing entries. 
+           Entry differences, are not merged. We need help here
+
+   - mailbox.tgz file, save  entire contents of a mailbox: mail, address book, 
+      calendar, task, briefcase ...
+     
+
+04 - Usage instructions 
+   -----------------------------------------------------------------------------
+
+   a) Set up your file /etc/zmbkpose/zmbkpose.conf
+
+   b) Begins doing a full backup for specific accounts
+    $ zmbkpose -f -a email1 
+    You'll get a full backup copy in $WORKDIR/email1/
+    You can make a conditional full backup only if the previous backup has 
+	 more than "time" old.
+    $ zmbkpose -F time -a email1 
+   
+   c) Perform incremental backups.
+    $ zmbkpose -i -a email1 
+    This does not make much sense. Try to do incremental backups only if the 
+     previous backup is too old.
+    $ zmbkpose -I time -a email1 
+
+    Where "time" is for example: "10hs" for 10 hours old , or "2d" for 2 days
+	 old, or "1w" for 1 week old, so on .
+    If you have no previous full backup, you can use "-t" in the same command 
+	 to automatically run a full backup.
+   
+   d) Programme incremental backups for all accounts, even during the hours of 
+       user activity. They are lightweight. Try to limit by execution time 
+       (-C time), number of accounts (-cn). Try also add delay between each 
+	   backup account (-e time).
+    $ zmbkpose -I 30h -C 3h -e 5s
+   
+   e) Delete old backups.  Assume the following example of account daily backup
+     day backup_type
+     --- -----------
+      1  FULL
+      2  INC
+      3  INC
+      4  INC
+      5  FULL
+      6  INC
+      7  INC
+     and on the 7th day, run: 
+     $ zmbkpose -a account -d 1d
+
+     Note you want to remove backups older than 1 day, so try to delete the 
+      copies of the days: 6,5,4,3,2, and 1 . This will leave inconsistent backups
+	  to disk (deletes the full of day 5).
+     Do not worry about it. zmbkpose will remove copies of the day: 4,3,2 and 1.
+     If you run:
+     $ zmbkpose -a account -d 4d: not will delete any backup.
+
+05 - Usage recommendations 
+   -----------------------------------------------------------------------------
+
+   * I recommend doing full backups during the night and incremental backups
+     throughout the day.
+
+   * Perform as many incremental backups throughout the day as you need. Try not
+     to overload the service. Try to limit by execution time (-C time), number
+     of accounts (-cn). Try also add delay between each backup account (-e time).
+
+   * Try the nightly backups do not continue as you begin daily activity, or while 
+     performing incremental backups. Limits the nightly backup runtime (-C time).
+
+   * Try to reduce the number of full backups, overload the service, and take up 
+     space. Incremental backups are fast.
+
+   * Do not run parallel backups (-p), worse service performance.
+
+   * Eliminate unnecessary copies of backups (-d time)
+
+
+06 - Usage example 
+   -----------------------------------------------------------------------------
+
+
+  It is my backup setup in a linux machine with 2400 Zimbra accounts, and 30 hours 
+   (approx.) maximum time for each account without backup.
+
+  * A wrapper script /usr/local/bin/zmbkpose.wrapper for stdout loggin redirection:
+--------------------------------------------------------------------------------
+#!/bin/bash
+
+#Full or incremental?
+unset mode
+[ -z "$mode" ] && echo -- "$@"|egrep -q '\W(-f|-F)\W' && mode="${mode}FULL."
+[ -z "$mode" ] && echo -- "$@"|egrep -q '\W(-i|-I)\W' && mode="${mode}INC."
+
+#Log file
+LOG_FILE=/var/log/zmbkpose/$(/bin/date '+%Y.%m.%d_%H.%M.%S').${mode}backup.log
+
+/usr/local/bin/zmbkpose $@ >$LOG_FILE 2>&1
+--------------------------------------------------------------------------------
+
+  * A wrapper script /usr/local/bin/zmbkpose.rotate.wrapper for maintenance, and
+   stdout loggin redirection:
+--------------------------------------------------------------------------------
+#!/bin/bash
+
+#Log file
+LOG_FILE=/var/log/zmbkpose/$(/bin/date '+%Y.%m.%d_%H.%M.%S').rotate.log
+
+#Delete backups older than ( now - time).  See "time FORMAT" below.
+# !!! Files are never deleted leaving inconsistent backups !!!
+
+TIME_TO_KEEP_BACKUPS=15d
+
+/usr/local/bin/zmbkpose -d $TIME_TO_KEEP_BACKUPS >$LOG_FILE 2>&1
+--------------------------------------------------------------------------------
+
+  * A cron file /etc/cron.d/zimbra_mail_backup 
+--------------------------------------------------------------------------------
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/
+LOG_FILE=$(/bin/date '+%Y.%m.%d_%H.%M.%S').log
+
+##FULL Backups
+0 0 * * * backupmail /usr/local/bin/zmbkpose.wrapper -F 20d -C 6h -c 50 -e 5s
+##INC Backups
+0 6  * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
+0 9  * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
+0 18 * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
+0 21 * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
+
+#Remove old backups
+0 2 * * * backupmail /usr/local/bin/zmbkpose.rotate
+
+#Remove old logs
+0 22 * * * backupmail find /var/log/zmbkpose -type f -mtime +30 -exec ls '{}' \;
+--------------------------------------------------------------------------------
+

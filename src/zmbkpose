@@ -1,4 +1,7 @@
 #!/bin/bash
+## Automatic vim seting if you are "modeline" on
+# vim: set ai tabstop=4:
+
 #####
 # zmbkpose
 #
@@ -27,879 +30,1136 @@
 #						   <bruno@4linux.com.br>
 #					       <bruno.gurgel@gmail.com>
 #
-# 24/05/2012 - Version 2.0 Beta - By William Felipe Welter
-#                                               <william.welter@4linux.com.br>
-#                                               <wfelipew@gmail.com>
 #
-#
+set -e
+INC_MARK=INC
+FULL_MARK=FULL
+HUMAN_DATE_FORMAT="%d/%m/%Y %H:%M:%S"
+DATE_TIME_MARK_FORMAT='%Y%m%d%H%M%S' #alphanumeric time sortable by the "sort" command
+CURL_args="-s -S -k"
+LDAP_FILE_IN_TAR=acct.ldif
+MAILBOX_FILE_IN_TAR=mailbox.tgz
 
 show_help ()
 {
-echo "Usage: 
-     zmbkpose -f 	
-			Execute full backup, all accounts.
-     zmbkpose -f mail1,mail2,...,mailn
-			Execute backup full for specific accounts.
-     zmbkpose -i 	
-			Execute a full incremental backup all accounts.
-			Needs a least one full backup of all account complete.
-     zmbkpose -i mail1,mail2,...,mailn	
-			Execute a incremental backup in specified accounts provided in the command line.
-			If the account doesn't have a previosly full backup, will be done in the same session.
-     zmbkpose -l
-			List backup sessions already done.
-     zmbkpose -r mail1,mail2,...,mailn nome_da_sessao	
-			Restore content from accounts specified by command line.
-			If yout dont provide the name session will be run a full restore: All Backup found, from the oldest to the newer.
-     zmbkpose -restoreAccount mail1,mail2,...,mailn
-			Restore accounts removed from the older backup to the newer.
-     zmbkpose -restoreAccount mail1,mail2,...,mailn --LDAPOnly nome_da_sessao
-			Restore only the user profile, including password.
-			TIP: Could be necesery update the server cache to apply restored attributes.
-			      zmprov fc account nome_da_conta
-     zmbkpose -d n
-			Where \"n\" is a number.
-			Exclude all backup before <number> days.
-     zmbkpose -d n weeks
-			Where \"n\" is a number.
-			Exclude all backup before <number> weeks.
-     zmbkpose -d n months
-			Onde \"n\" é um número.
-			Exclude all backup before <number> of months.
-     zmbkpose --restoreAllAccounts 
-			Restore all accounts 
+	cat<<-EOF 
+ Options:
+    -a act[,act]... Operates on specific accounts. Default all.
+    -c n            Limits the number of accounts in backups to "n"
+    -C time         Similar to "-c", backups up to reach the time "time"
+    -d time         Delete old backups, if them are "time" old
+    -e time         Wait a time between each backup of an account
+    -f              Full backup
+    -F time         Conditional full backup. If last full backup is "time" old
+    -h              This help
+    -i              Incremental backup
+    -I time         Conditional inc. backup. If last inc backup is "time" old
+    -l,-m,-n        List all backups info(-l), only first backup(-m) or last(-n)
+    -p n            Backups in parallel, with a maximum of "n" instances
+    -r              Restore accounts from last full and later incrementals
+    -R time         Restore accounts from the nearest backup before the now-time
+    -s              Simulation of operations as if they really do
+    -t              On incremental backup, do full is not previous incremental
+    -u              On failure of a backup account, does not stop.
+ 
+ Usage: 
+   zmbkpose -d time [-s]
+         Delete backups older than ( now - time).  See "time FORMAT" below.
+          !!! Files are never deleted leaving inconsistent backups !!!
+         NOTE: if you have backups as follow, y execute it on Friday with "-d 1d":
+           Monday   : Backup FULL   *
+           Tuesday  : Backup INC    *
+           Wednesday: Backup FULL  
+           Thursday : Backup INC
+           Friday   : Backup INC
+         The backups with * will be deleted. If removed oldest backups than Friday,
+          (now - 1d) would remain an inconsistent backup.
 
-     zmbkpose --backupDistributionList
-			Make full backup of Distribution  Lists
+   zmbkpose -f [ -a mail1,mail2 mail3 ] [-s] [-c] [-C] [-e] [-u]
+         Full backup for all or specific accounts. 
 
-     zmbkpose --restoreDistributionList
-			Restore all distribution lists from last backup
+   zmbkpose -F time [ -a mail1,mail2 mail3 ] [-s] [-c] [-C] [-e] [-u]
+         Full backup for all or specific accounts only if the accounts don't have a
+          full backup from time. See "time FORMAT" below.
 
-     zmbkpose --backupAlias
-			Make full backup of Alias
+   zmbkpose -i [ -a mail1,mail2 mail3 ] [-c] [-C] [-e] [-s] [-t] [-u]
+         Incremental backup (or full if no previous) for all or specific accounts.
 
-     zmbkpose --restoreAlias
-			Restore all alias from last backup
+   zmbkpose -I time [ -a mail1,mail2 mail3 ] [-c] [-C] [-e] [-s] [-t] [-u]
+         Incremental backup for all or specific accounts only if the accounts 
+          don't have a inc. backup from time. See "time FORMAT" below.
 
-	
+   zmbkpose -l [ -a mail1,mail2 mail3 ]
+         List mailbox backup copies for all or specific accounts.
 
-"
-# TODO Implements a hidden "Disaster Recovery" option + confirmations
-exit 0 
+   zmbkpose -m [ -a mail1,mail2 mail3 ]
+         List first mailbox backup copy for all or specific accounts.
+
+   zmbkpose -n [ -a mail1,mail2 mail3 ]
+         List last mailbox backup copy for all or specific accounts.
+
+   zmbkpose -p n 
+		 Backups in parallel, with a maximum of "n" instances
+         Override PARALLEL_SUPPORT, and MAX_PARALLEL_PROCESS from config.
+
+   zmbkpose -r [ -a mail1,mail2 mail3 ] [-s]
+         Restore from backups(last full + later incrementals) for all or 
+          specific accounts.
+
+   zmbkpose -R time [ -a mail1,mail2 mail3 ] [-s]
+         Restore all (or specific accounts) from the nearest backup before the
+          time specified. time can be:
+           * interval specified by "time FORMAT" (see below). The restore will be
+              from ( now - time ).
+           * date_time_mark internal format expresed by "date" 
+              command using '$DATE_TIME_MARK_FORMAT' format.
+
+   time FORMAT:
+   -----------
+         Time can be expresed in format n[smhdwM], where n is a number, "s" for 
+         seconds "m" for minutes, "h" for hours, "d" for days, "w" for weeks, 
+         and "M" for months.
+	EOF
 }
 
-
-exibe_help ()
+debug()
 {
-echo "Usos: 
-     zmbkpose -f 	
-			Executa o backup full de todas as contas.
-     zmbkpose -f mail1,mail2,...,mailn
-			Executa o backup full das contas especificadas na linha de comandos.
-     zmbkpose -i 	
-			Executa o backup incremental de todas as contas.
-			Precisa de pelo menos um backup full completo.
-     zmbkpose -i mail1,mail2,...,mailn	
-			Executa o backup incremental das contas especificadas na linha de comandos.
-			Se a conta especificada não tiver um full aterior, será feito nesta mesma sessão.
-     zmbkpose -l
-			Lista as sessões de backup já realizadas.
-     zmbkpose -r mail1,mail2,...,mailn nome_da_sessao	
-			Restaura o conteúdo das contas especificadas na linha de comando.
-			Se o nome da sessão não for especificado, será feita a restauração completa: Todas os backups encontrados, do mais antigo ao mais recente.
-     zmbkpose -restoreAccount mail1,mail2,...,mailn
-			Restaura contas apagadas a partir do backup mais antigo encontrado até o mais novo.
-     zmbkpose -restoreAccount mail1,mail2,...,mailn --LDAPOnly nome_da_sessao
-			Restaura apenas o perfil do usuário, incluindo senha utilizada.
-			DICA: Pode ser necessário atualizar o cache do servidor para imediata aplicação dos atributos restaurados.
-			      zmprov fc account nome_da_conta
-     zmbkpose -d n
-			Onde \"n\" é um número.
-			Exclui todos os backups anteriores a quantidade de dias especificada na linha de comandos.
-     zmbkpose -d n weeks
-			Onde \"n\" é um número.
-			Exclui todos os backups anteriores a quantidade de semanas especificada na linha de comandos.
-     zmbkpose -d n months
-			Onde \"n\" é um número.
-			Exclui todos os backups anteriores a quantidade de meses especificada na linha de comandos.
-
-"
-# TODO: Deixar uma opção de "Disaster Recovery" oculta + confirmações
-exit 0
+	echo "$($DATE_cmd '+%F %T') DEBUG: $@ " >&2
 }
 
-#This functions realize backup of distribution list
-backup_distribution_list()
+error()
 {
-	COUNT=0
-	LISTATODASCONTAS=$(mktemp)
-	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraDistributionList)" mail | grep ^mail | awk '{print $2}' > "$LISTATODASCONTAS"
-	SESSAO="distlist-"$(date  +%Y%m%d%H%M%S)
-	echo "SESSAO: $SESSAO started on $(date)" >> $WORKDIR/sessions.txt
-	TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	
-	for MAIL in $(grep @ $LISTATODASCONTAS); do
-        	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(&(mail=$MAIL)(objectclass=zimbraDistributionList))" > $TEMPDIR/$MAIL.ldiff
-		echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-        	let COUNT++
+	echo "$($DATE_cmd '+%F %T') ERROR: $@ " >&2
+}
+
+################################################################################
+# LDAP functions ###############################################################
+################################################################################
+
+#
+## Get ldap attributes from a mailbox account
+function ldap_get_mailbox_atts()
+{
+	local mailbox="$1"
+	local ldap_req_atts="$2"
+	ldap_search "(mail=$mailbox)" "$ldap_req_atts" 
+}
+
+#
+## Do ldap search and get specific attributes using a ldap_filter 
+function ldap_search()
+{
+	local ldap_filter="$1"
+	local ldap_req_atts="$2"
+	local ldap_base_dn="${3}"
+
+	$LDAPSEARCH_cmd -x -H $LDAPMASTERSERVER \
+		-D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b "$ldap_base_dn" \
+		-LLL "$ldap_filter" $ldap_req_atts 
+}
+
+#
+## Get accounts from ldap
+function ldap_get_accts()
+{
+	ldap_search "(objectclass=zimbraAccount)" "zimbraMailDeliveryAddress" \
+		| $GREP_cmd ^zimbraMailDeliveryAddress | $AWK_cmd '{print $2}'
+}
+
+#
+## Get groups from ldap
+function ldap_get_groups()
+{
+	#Get email of ldap groups is not trivial, because zimbra saves 
+	# it in the "zimbraMailAlias" attribute. If the group contains 
+	# an alias, these email too is saved in the "zimbraMailAlias" 
+	# attribute. This code try to implicate the "uid" attribute for 
+	# determine the correct mail value.
+	for dn in $(
+		ldap_search "(objectclass=zimbraDistributionList)" "dn"| $GREP_cmd '^dn:'| $AWK_cmd '{print $2}'
+		);do
+		uid=$(ldap_search "(objectclass=*)" "uid" "$dn" |$GREP_cmd '^uid'|$AWK_cmd '{print $2}')
+		ldap_search "(objectclass=*)" "mail" "$dn" |$EGREP_cmd "^mail: *$uid@"|$AWK_cmd '{print $2}'
 	done
-	
-	mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-	echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
-	echo "$(date) - Backup completed for $COUNT lists" >> $LOGFILE
-	exit 0
 }
 
+#
+## Add ldap entry
+function ldap_add(){
+	$LDAPADD_cmd -x -H $LDAPMASTERSERVER \
+		-D $LDAPZIMBRADN -w $LDAPZIMBRAPASS >&2
+}
 
-
-#Efetua backup full de todas as contas paralelamente
-#Make full backup of all accounts, paralel.
-backup_all_accounts_parallel()
+#
+## Check if ldap dn exists 
+function ldap_dn_exists()
 {
-	COUNT=0
-	LISTALLACCOUNTS=$(mktemp)
-	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTALLACCOUNTS"
-	SESSION="full-"$(date  +%Y%m%d%H%M%S)
-	echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
-	TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	
-	for MAIL in $(grep @ $LISTALLACCOUNTS); do
+	local dn="$1"
+	ldap_search "(objectClass=*)" dn "$dn" >/dev/null 2>&1
+}
 
-	        # Contador de processos curl simultaneos
-		# Simultaneous Curl Process counter
-	        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
+#
+## Get atribute ldap attribute from ldif data in stdin
+function ldif_analysis_get_att()
+{
+	local attribute="$1"
+	local multivalued="$2"
+	local sed_cmd='q;' ; [ -n "$multivalued" ] && sed_cmd=''
+	$SED_cmd -n -e "/^$attribute:/{p;$sed_cmd}"| $SED_cmd -r -e "s/^$attribute: ?//"
+}
 
-	        if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
-	                MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
-	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
-	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-	                let COUNT++
-	        else
-	                until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
-	                do
-	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	                        sleep 5
-	                        #echo "Max process number reached ($STAT). Waiting slot."
-	                done
-
-			# Execution block
-	                # Bloco de execução
-	                MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
-	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
-	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-	                let COUNT++
-	                # Fim Bloco de execução
-
-	        fi
+#
+## Get zimbra account type (ACCOUNT|GROUP) from ldap attributes in file or stdin
+function ldif_analysis_account_type()
+{
+	for objectClass in $(ldif_analysis_get_att objectClass y);do
+		case $objectClass in
+			zimbraDistributionList) echo -n GROUP && return ;;
+			zimbraAccount) echo -n ACCOUNT && return ;;
+		esac
 	done
-
-	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
-	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
-
-	echo "$(date) - Backup completed for $COUNT account(s)" >> $LOGFILE
-	exit 0
 }
 
 
-
-
-#Efetua backup full de todas as contas sequencialmente
-#Make full backup of all accounts, sequential.
-backup_all_accounts ()
+#
+## Get entry dn based, from ldif data in stdin
+function ldif_analysis_get_entry()
 {
-	LISTALLACCOUNTS=$(mktemp)
-	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTALLACCOUNTS"
-	SESSION="full-"$(date  +%Y%m%d%H%M%S)
-	echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
-	TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	
-	for MAIL in $(grep @ $LISTALLACCOUNTS); do
-        	MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
-	        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
-	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-	done
+	local dn="$1"
+	$SED_cmd -r -n -e "/dn: $dn/,/^$/p"
+}
 
-	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
-	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
-	exit 0
+################################################################################
+# ZIMBRA specific functions ####################################################
+################################################################################
+
+#
+## Do a zimbra ldap backup
+function zimbra_ldap_backup()
+{
+	local account="$1"
+	local backup_file=$2
+
+	#Mailbox subtree 
+	local ldap_dn=$(ldap_get_mailbox_atts "$account" dn| 
+		$SED_cmd -r -n -e 's/dn: (.*)/\1/p')
+	[ -z "$ldap_dn" ] && error "$account - Account does not exists" && return 1
+	ldap_search '(objectclass=*)' '' "$ldap_dn" > $backup_file
+	[ -f $backup_file -a ! -s $backup_file ] && \
+		error "$account - Ldap backup empty" && return 1
+
+	#Alias entries
+	zimbraId=$($GREP_cmd "^zimbraId:" "$backup_file" | $AWK_cmd '{print $2}')
+	[ -z "$zimbraId" ] && \
+		error "$account - Ldap zimbra entry whithout zimbraID attribute." && return 1
+	ldap_search "(zimbraAliasTargetId=$zimbraId)" >> $backup_file
 }
 
 
-
-backup_accounts_parallel ()
+function zimbra_mailbox_backup()
 {
+	local mailbox="$1"
+	local mailhost="$2"
+	local search_query="$3"
+	local backup_file=$4
 
-        SUBSESSION="$SESSION"
-        SUBTEMP=$TEMPDIR
+	[ -n "$search_query" ] && search_query="&$search_query"
 
-
-        SESSION="full-"$(date  +%Y%m%d%H%M%S)
-        LISTALLACCOUNTS=`echo "$1" | sed 's/,/\n/g'`
-
-        echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
-        TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	K=1
-
-	while true; do
-
-	        MAIL=$(echo $1, | cut -d, -f$K)
-	        if [ -z $MAIL ]; then
-	                break
-	        fi
-
-	
-	        # Contador de processos curl simultaneos
-	        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-
-	        if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
-	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
-	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-	                let COUNT++
-	        else
-	                until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
-	                do
-	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	                        sleep 5
-	                        #"Número máximo de processos atingido ($STAT). Aguardando vaga."
-	                done
-
-			# Bloco de execução
-			$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-			MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
-			echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-			let COUNT++
-			# Fim Bloco de execução
-
-	        fi
-
-
-		((K = K+1))
-		unset MAIL
-        	sleep 1
-	done
-
-
-        
-        if [ -d "$WORKDIR/$SESSION/"  ]; then
-                cp "$TEMPDIR/"* "$WORKDIR/$SESSION/" && rm -rf "$TEMPDIR"
-        else
-                mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
-        fi
-        
-        echo "SESSION: $SESSION concluída em $(date)" >> $WORKDIR/sessions.txt
-        SESSION="$SUBSESSION"
-        TEMPDIR="$SUBTEMP"
+	$CURL_cmd $CURL_args -u $ADMINUSER:$ADMINPASS -o "$backup_file" \
+		"https://$mailhost:7071/home/$mailbox/?fmt=tgz$search_query" 
 }
 
-
-
-incremental_all_accounts ()
+zimbra_mailbox_restore()
 {
+	local mailbox="$1"
+	local mailhost="$2"
+	local backup_file="$3"
+	[ -z "$mailbox" -o -z "$mailhost" ] && return 1
+	shift 2
+	[ -n "$backup_file" ] && shift 1
 
-	FULLSESSIONLABEL=$(grep "SESSION: full-" $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
-	
-	if ! [ -z "$FULLSESSIONLABEL" ]; then
-        	if ! [ -d "$WORKDIR/$FULLSESSIONLABEL" ]; then
-        	        echo "Directory $WORKDIR/$FULLSESSIONLABEL doesn't exist. Impossible to continue."
-        	        exit 0
-        	fi
+	#If backup_file is file, then check it 
+	if [ -n "$backup_file" -a "$backup_file" != "-" ];then
+ 		[ ! -f "$backup_file" ] && return 1
+ 		[ ! -s "$backup_file" ] && return 0
+		shift 1
 	else
-        	echo "No full backup found. Impossible to continue."
-        	exit 0
+		backup_file='-'
 	fi
 
 
-	INCFROM=$(grep INCFROM: $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
-	LISTALLACCOUNTS=$(mktemp)
-	$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAccount)" zimbraMailDeliveryAddress zimbraMailHost | grep ^zimbraMail | awk '{print $2}' > "$LISTALLACCOUNTS"
-	SESSION="inc"-$(date  +%Y%m%d%H%M%S)
-	echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
-	TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	
-	for MAIL in $(grep @ $LISTALLACCOUNTS); do
-	        FULLEXISTS=""
-	        FULLEXISTS=$(grep $MAIL $WORKDIR/sessions.txt | grep ^full)
-	        if [ -z "$FULLEXISTS" ]; then
-	                echo " $MAIL doesn't have previos full backup. Executing now..."
-	                backup_accounts $MAIL
-	        else
-	                INCFROM=$(grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN | tail -1 | awk -F: '{print $3}')
-	                if [ "$INCFROM" = "$(date +%m/%d/%y)" ]; then
-	                        echo "WARN: $MAIL already has backup today. Nothing to do." | tee -a $WORKDIR/sessions.txt
-	                else
-	                        MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
-	                        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
-# "
-	                        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-	                fi
+	$CURL_cmd $CURL_args --data-binary "@$backup_file" -u $ADMINUSER:$ADMINPASS \
+	  "https://$mailhost:7071/home/$mailbox/?fmt=tgz&resolve=skip"
+}
+
+
+################################################################################
+# TIME functions ###############################################################
+################################################################################
+
+#
+## Current time-stamp on DATE_TIME_MARK format
+function time_cur_date_time_mark() {
+	$DATE_cmd "+$DATE_TIME_MARK_FORMAT" $1
+}
+
+#
+## Current time-stamp
+function time_cur_tt(){
+	$DATE_cmd "+%s" $1
+}
+
+#
+## Convert date-time format from $DATE_TIME_MARK_FORMAT to timestamp
+function time_cnv_date_time_mark_to_tt()
+{
+	$DATE_cmd --date="${1:0:4}-${1:4:2}-${1:6:2} ${1:8:2}:${1:10:2}:${1:12:2}" '+%s'
+}
+
+#
+## Convert date-time format from $DATE_TIME_MARK_FORMAT to human format
+function time_cnv_date_time_mark_to_human(){
+	#convert date format from "YYYYMMDDHHMMSS" to human format
+	$DATE_cmd --date="${1:0:4}-${1:4:2}-${1:6:2} ${1:8:2}:${1:10:2}:${1:12:2}" "+$HUMAN_DATE_FORMAT"
+}
+#
+## Convert date-time format from $DATE_TIME_MARK_FORMAT to human format in very large
+## stdin data (better perfomance that time_cnv_date_time_mark_to_human function)
+## NOTE: this function convert time betwen marks: <dc $DATE_TIME_MARK_FORMAT > 
+function pipe_date_time_conv(){
+        $AWK_cmd -v HUMAN_DATE_FORMAT="$HUMAN_DATE_FORMAT" '{
+                date_time_mark=gensub(/(.*)<dc ([0-9]+) >(.*)/,"\\2","g") ;
+                date_time_mark_h = strftime(HUMAN_DATE_FORMAT,mktime(      \
+                        substr(date_time_mark,1,4) " " \
+                        substr(date_time_mark,5,2) " " \
+                        substr(date_time_mark,7,2) " " \
+                        substr(date_time_mark,9,2) " " \
+                        substr(date_time_mark,11,2) " " \
+                        substr(date_time_mark,13,2) ));
+                print gensub(/(.*)<dc ([0-9]+) >(.*)/,"\\1\"" date_time_mark_h "\"\\3","g") ;
+                }'
+}
+
+
+
+#
+## date command in human format
+function human_date_time()
+{
+	$DATE_cmd "+$HUMAN_DATE_FORMAT" "$1"
+}
+
+#
+## Convert time expresion in format [0-9]+[smhdwM] to secs.
+function cnv_time_expr_to_secs()
+{
+	local time_exp="$1"
+
+	echo "$time_exp"|$EGREP_cmd -q '^[0-9]+[smhdwM]$'|| return 1
+	case $time_exp in 
+		*s) echo ${time_exp%s} ;; #Secs to secs
+		*m) echo $(( ${time_exp%m} * 60 ));; #Minutes to secs
+		*h) echo $(( ${time_exp%h} * 3600 ));; #Hours to secs
+		*d) echo $(( ${time_exp%d} * 86400 ));; #Days to secs
+		*w) echo $(( ${time_exp%w} * 604800 ));; #Weeks to secs
+		*M) echo $(( ${time_exp%M} * 2592000 ));; #Months to secs
+	esac
+}
+
+#
+## Check if arg. is a valid date-time mark, and return it
+function is_date_time_mark()
+{
+	echo "$1"|$EGREP_cmd '^[0-9]{14}$'
+}
+
+################################################################################
+# BACKUP db functions ##########################################################
+################################################################################
+
+#
+## Create a destination backup file. Name is critical for avoid duplicates
+function backup_create_file(){
+	local dir="$1"
+	local fid="$2"
+	local ending="$3"
+        local msg=""
+	local max_wait_sec=6
+ 	local start_tt=$(time_cur_tt)
+
+	#Locking for create a number
+	while ! msg=$(mkdir $dir.lock 2>&1) ;do 
+		[ "$(( $(time_cur_tt) - $start_tt ))" -gt $max_wait_sec ] && \
+			echo $msg >&2 && return 1 
+		sleep 1
+	done
+
+	while [ -f $dir/${fid}${ending} ];do let fid++ ;done
+	touch $dir/${fid}${ending}
+
+	#Release lock
+	rm -rf $dir.lock
+	echo $dir/${fid}${ending}
+}
+
+#
+## Get files from backup account
+function get_backups_account(){
+	local account="$1"
+	local position="$2" # Optional FIRST|LAST
+	local order="$3" #Optional ASC|DESC
+
+	[ -n "$position" -a "$position" != FIRST -a "$position" != LAST ] && unset position
+	[ -n "$order" -a "$order" != ASC -a "$order" != DESC ] && order=ASC
+	local sort_order=''; [ "$order" = DESC ] && sort_order='-r'
+
+	[ ! -d "${WORKDIR}/$account" ] && return 0 
+
+	#LAST link exists?
+	if [ "$position" = LAST  -a -L "${WORKDIR}/$account/LAST" -a \
+		-f $($READLINK_cmd -f "${WORKDIR}/$account/LAST") ] ;then 
+		$READLINK_cmd -f "${WORKDIR}/$account/LAST"
+		return 0
+	fi
+
+	$FIND_cmd "${WORKDIR}/$account" -maxdepth 1 -mindepth 1 -type f|\
+		$SORT_cmd $sort_order |\
+		( if [ "$position" = LAST ];then
+			$SED_cmd -n '$p' 
+	  	elif [ "$position" = FIRST ];then
+			$SED_cmd -n '1p' 
+	  	else
+			cat
+	  	fi
+		)
+}
+
+#
+## Get backup cycles (full and subsequent incrementals) prior to end 
+##  date($date_time_mark_until),  ordered by time (oldest first).
+## This function is designed to delete old backups, and always tries 
+##  to keep at least one backup cycle, not returning it. If you want 
+##  to delete all backups for a user, do it yourself from the filesystem.
+function get_backup_cycles_older_than(){
+	local account="$1"
+	local date_time_mark_until="$2"
+	echo $date_time_mark_until
+	[ -z "$date_time_mark_until" ] && return 1
+
+	while read date_time_mark full_inc bkfile ;do 
+		[ -z "$date_time_mark" ] && continue
+		#Skip backups after to end date
+		[ $date_time_mark -gt $date_time_mark_until ] && continue
+		#Search for start of cycle
+		if [ -z "$cycles_to_maintain_reached" -a $full_inc != FULL ];then
+			continue
+		elif [ -z "$cycles_to_maintain_reached" ];then
+			#Here is the beginning of cycle one full backup
+			cycles_to_maintain_reached=y
+			continue
 		fi
-	done
+		#Older backup files
+		echo $bkfile
+	done<<-BACKUP_LIST | $SORT_cmd
+		$(get_backups_account $account "" DESC | 
+			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH
+		)
+		BACKUP_LIST
+}
 
+## Get files from last backup cycle (full and subsequent incrementals), 
+##  ordered by time (oldest first), ending with last backup without 
+##  exceeding the end date($date_time_mark_until)
+function get_last_backup_cycle_prior_to(){
+	local account="$1"
+	local date_time_mark_until="$2"
+	[ -z "$date_time_mark_until" ] && return 1
 
-	if [ $( ls $TEMPDIR | wc -l ) -ne 0 ]; then
-	        
-		if [ -d "$WORKDIR/$SESSION" ];  then
-	                cp "$TEMPDIR/"* "$WORKDIR/$SESSION/" && rm -rf "$TEMPDIR"
-	        else
-	                mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
-	        fi
-	
-	else
-	        rm -rf "$TEMPDIR"
-	fi
-
-	echo "SESSION: $SESSION concluída em $(date)" >> $WORKDIR/sessions.txt
-	exit 0
+	while read date_time_mark full_inc bkfile ;do 
+		[ -z "$date_time_mark" ] && continue
+		[ $date_time_mark -gt $date_time_mark_until ] && continue
+		echo $bkfile
+		[ $full_inc = FULL ] && break
+	done<<-BACKUP_LIST | $SORT_cmd
+		$(get_backups_account $account "" DESC | 
+			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH
+		)
+		BACKUP_LIST
 }
 
 
-backup_accounts ()
-{
-        SUBSESSION="$SESSION"
-        SUBTEMP=$TEMPDIR
-
-        if [ -z $2 ]; then
-                SESSION=$SUBSESSION
-                CONTROLE=1
-        else
-                SESSION="full-"$(date  +%Y%m%d%H%M%S)
-                CONTROLE=0
-        fi
-
-        echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
-        TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	K=1
-
-	while true; do
-
-	        MAIL=$(echo $1, | cut -d, -f$K)
-
-	        if [ -z $MAIL ]; then
-	                break
-	        fi
-
-	        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	        MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz
-	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-	        ((K = K+1))
-	        unset MAIL
-	        sleep 1
-	done
-
-
-        
-        if [ -d "$WORKDIR/$SESSION/"  ]; then
-                cp "$TEMPDIR/"* "$WORKDIR/$SESSION/" && rm -rf "$TEMPDIR"
-        else
-                mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
-        fi
-        
-	echo "SESSION: $SESSION concluída em $(date)" >> $WORKDIR/sessions.txt
-	SESSION="$SUBSESSION"
-	TEMPDIR="$SUBTEMP"
+#
+## Get accounts with backups
+function get_accounts_in_backups(){
+	$FIND_cmd "${WORKDIR}" -maxdepth 1 -mindepth 1 -type d \
+		|get_from_backup_file_name ACCOUNT
 }
 
+#
+## Calc file size from archs in stdin(one per line)
+function calc_files_size_in_stdin(){
+	local sep="$1"
+	local unit="$2" 
+	local size_b=0
+	local size=0
 
-
-
-incremental_accounts ()
-{
-
-	SESSION="inc-"$(date  +%Y%m%d%H%M%S)
-	echo "SESSION: $SESSION started on $(date)" >> $WORKDIR/sessions.txt
-	TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-	K=1
-	while true; do
-        	
-		MAIL=$(echo $1, | cut -d, -f$K)
-
-	        if [ -z $MAIL ]; then
-        	        break
-       	 	else
-			FULLEXISTS=""
-			FULLEXISTS=$(grep $MAIL $WORKDIR/sessions.txt | grep ^full)
-			
-			if [ -z "$FULLEXISTS" ]; then
-                        	echo " $MAIL doesn't have previos full backup. Executing now..."
-				backup_accounts $MAIL $SESSION
-				((K = K+1))
-        	        else
-        	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-        	                INCFROM=$(grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN | tail -1 | awk -F: '{print $3}')
-        	                
-				if [ "$INCFROM" = "$(date +%m/%d/%y)" ]; then
-        	                        echo "WARN:  $MAIL already has backup today. Nothing to do." | tee -a $WORKDIR/sessions.txt
-        	                        ((K = K+1))
-        	                else
-        	                        MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
-	                                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-                                	((K = K+1))
-	                        fi
+	while read file;do
+		fsize_b=$(stat --printf='%s' $file)
+		if [ $unit = H_SIZE ] ;then # Human size
+			if   [ $fsize_b -lt 1024 ];then funit=B_SIZE
+			elif [ $fsize_b -lt 1048576 ];then funit=K_SIZE
+			elif [ $fsize_b -lt 1073741824 ];then funit=M_SIZE
+			elif [ $fsize_b -lt 1099511627776 ];then funit=G_SIZE
+			elif [ $fsize_b -lt 1125899906842624 ];then funit=T_SIZE
 			fi
-	        fi
-	
-        	unset MAIL
-	done
-
-	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
-	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
-	exit 0
-}
-
-
-
-
-
-
-list_sessions ()
-{
-	egrep 'SESSAO:|SESSION:' $WORKDIR/sessions.txt| egrep 'iniciada|started' |  awk '{print $2}' | sort | uniq  #egrep for with OR, for previosly compatibility
-	exit 0
-}
-
-
-restore_accounts ()
-{
-
-	BKPSACCOUNT=$(mktemp)
-	K=1
-	
-	while true; do
-
-	        MAIL=$(echo $1, | cut -d, -f$K)
-
-	        if [ -z $MAIL ]; then
-	                break
-	        fi
-
-	        grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN: > $BKPSACCOUNT
-
-	        if ! [ -s $BKPSACCOUNT ]; then
-	                echo "$MAIL: No backup found. Impossible to restor"
-	                ((K = K+1))
-	        else
-                	if [ -z $2 ]; then
-                		echo "Not implemented."
-                		# Restauração completa
-				# Complete restoration
-                		((K = K+1))
-                	else
-                        	SESSIONACCOUNT=$(grep $2 $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
-
-	                        if [ -z $SESSIONACCOUNT ]; then
-	                                echo "$MAIL: Session $2 doesn't exist. Impossible to continue."
-	                                break
-	                        else
-	                                ACCOUNTONSESSION=$(grep $MAIL $BKPSACCOUNT | grep $SESSIONACCOUNT)
-                                	if [ -z $ACCOUNTONSESSION ]; then
-                                        	echo "$MAIL not found in session $SESSIONACCOUNT. Impossible to restore."
-                                        	((K = K+1))
-                                	else
-                                        	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-	                                        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-        	                                $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
-        	                                $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
-        	                                ((K = K+1))
-        	                                unset MAIL
-                                	fi
-                        	fi
-                	fi
-        	fi
-	done
-	exit 0
-}
-
-
-
-
-restore_LDAP_account ()
-{
-	BKPSACCOUNT=$(mktemp)
-	K=1
-
-	while true; do
-	
-	        MAIL=$(echo $1, | cut -d, -f$K)
-	        if [ -z $MAIL ]; then
-	                break
-	        fi
-
-	        if [ -z $2 ]; then
-
-	                EXISTE=$($(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(&(objectclass=zimbraAccount)(zimbraMailDeliveryAddress=$MAIL))" uid)
-	                if ! [ -z "$EXISTE" ]; then
-	                        echo "Account $MAIL exists. Use zmbkpose -r $MAIL SESSION_name."
-	                        ((K = K+1))
-	                else
-	                        grep $MAIL $WORKDIR/sessions.txt | grep -e ^inc- -e ^full- > $BKPSACCOUNT
-	                        if ! [ -s $BKPSACCOUNT ]; then
-	                                echo "$MAIL: No backup found. Impossible to restore."
-	                                ((K = K+1))
-	                        else
-	                                echo "Sessions found $(cat $BKPSACCOUNT | awk -F: '{print $1}')"
-	                                for SESSIONACCOUNT in $(cat $BKPSACCOUNT | awk -F: '{print $1}'); do
-	                                        echo "Restoring from $SESSIONACCOUNT"
-                                        	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-                                        	$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}') 2>/dev/null
-                                        	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
-                                        	echo "$MAIL restored from  $SESSIONACCOUNT"
-                                	done
-                                	((K = K+1))
-                                	unset MAIL
-                        	fi
-                	fi
-        	else
-                	SESSIONACCOUNT=$(grep $2 $WORKDIR/sessions.txt | grep $MAIL | tail -1 | awk -F: '{print $1}')
-                	if [ -z $SESSIONACCOUNT ]; then
-                	        echo "$MAIL: Session $2 doesn't exist or account not present. Impossible to restore."
-                	        ((K = K+1))
-                	else
-                        	USERDN=$(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-                        	$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN
-                        	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
-                        	echo "User's profile and configurations restored to $SESSIONACCOUNT"
-                        	((K = K+1))
-                        	unset MAIL
-                	fi
-        	fi
-	done
-	exit 0
-}
-
-
-
-restore_all_accounts_parallel ()
-{
-	for BKP in $(grep -e ^full- -e ^inc- $WORKDIR/sessions.txt); do
-		STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	
-		if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
-        		
-			SESSIONACCOUNT=$(echo $BKP | awk -F: '{print $1}')
-		        MAIL=$(echo $BKP | awk -F: '{print $2}')
-       		
-	        	USERDN=$(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-		        MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-	        	echo "Restoring $MAIL"
-
-		        $(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN 2>/dev/null
-	        	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
-
-		        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &	
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
-		        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
-
-			echo "$MAIL restored"
 		else
-			until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
-	                do
-	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	                        sleep 5
-				#Número máximo de processos atingido ($STAT). Aguardando vaga."
-	                done
-		
-			SESSIONACCOUNT=$(echo $BKP | awk -F: '{print $1}')
-	                MAIL=$(echo $BKP | awk -F: '{print $2}')
-
-			USERDN=$(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-			MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-			echo "Restoring $MAIL"
-			
-			$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN 2>/dev/null
-			$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
-
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
-			echo "$MAIL restored"
-
+			funit=$unit
 		fi
+		case "$funit" in
+			B_SIZE)fsize=$size_b; funit=B ;;
+			K_SIZE)fsize=$(( $fsize_b / 1024 )) ; funit=K ;;
+			M_SIZE)fsize=$(( $fsize_b / 1024 / 1024 )) ; funit=M ;;
+			G_SIZE)fsize=$(( $fsize_b / 1024 / 1024 / 1024 )) ; funit=G;;
+			T_SIZE)fsize=$(( $ffsize_b / 1024 / 1024 / 1024 / 1024 )); funit=T ;;
+		esac
+		echo "${file}${sep}${fsize}${funit}"
 	done
+}
+
+
+#
+## Extract information from backup file names
+function get_from_backup_file_name(){
+	local what='';
+	while [ -n "$1" ];do
+		case "$1" in
+			WORKDIR)	 	  what="${what}${what:+ }\1";;
+			ACCOUNT)	 	  what="${what}${what:+ }\2";;
+			DATE_TIME_MARK)   what="${what}${what:+ }\3";;
+			DATE_TIME_MARK_H) what="${what}${what:+ }<dc \3 >"; local dc=1;;
+			FULL_INC)	 	  what="${what}${what:+ }\4";;
+			ARCH_FORMAT) 	  what="${what}${what:+ }\5";;
+			FULL_PATH) 		  what="${what}${what:+ }\1\/\2\/\3\:\4\.\5";;
+			H_SIZE) 	      what="${what}${what:+ }\6";local cs=1;local u=$1;;
+			*) true;;	
+		esac
+		shift 1
+	done
+	[ -z "$what" ] && return 0
+	cat $@| \
+	  if [ -n "$cs" ];then calc_files_size_in_stdin '|' $u;else cat;fi |\
+	  $SED_cmd -n -r \
+	    "s/(${WORKDIR//\//\\/})\/([A-Za-z0-9._%+-]+\@[A-Za-z0-9._%+-]+)\/?([0-9]{14})?\:?($FULL_MARK|$INC_MARK)?\.?(tar)?\|?([0-9]+[BKMGT])?(.*)/$what/p" |\
+	  if [ -z "$dc" ];then cat ;else pipe_date_time_conv ;fi # Date conversion 
+}
+
+#
+## Get the date and time of last backup 
+function get_account_date_time_mark_last_backup(){
+	local account="$1"
+	get_backups_account "$account" LAST |get_from_backup_file_name DATE_TIME_MARK
+}
+
+#
+## Get date_time mark from last full backup
+function get_date_time_mark_last_full_backup(){
+	local account="$1"
+	get_backups_account "$account" |\
+		get_from_backup_file_name DATE_TIME_MARK FULL_INC |\
+		$EGREP_cmd "$FULL_MARK$" |\
+		$SED_cmd -n -e '$p' |\
+		$AWK_cmd '{print $1}'
+}
+
+#
+## Get date_time mark from last full backup
+function get_date_time_mark_last_inc_backup(){
+	local account="$1"
+	get_backups_account "$account" |\
+		get_from_backup_file_name DATE_TIME_MARK FULL_INC |\
+		$EGREP_cmd "$INC_MARK$" |\
+		$SED_cmd -n -e '$p' |\
+		$AWK_cmd '{print $1}'
+}
+
+#
+## Get information from account backups
+get_account_backups_info(){
+	local position="$1" # (FIRST|LAST|any) :Get info from first/last/any backup
+	shift 1
+	local accounts="$@"
+	[ -z "$accounts" -o -z "$position" ] && return 1
+
+	( for account in $accounts;do
+		get_backups_account "$account" $position 
+	done 
+	) | get_from_backup_file_name ACCOUNT DATE_TIME_MARK_H FULL_INC H_SIZE #| \
+	#( while read account date_time_mark full_inc hsize;do 
+		#[ -z "$account" ] && continue
+		##human_date_time=$(time_cnv_date_time_mark_to_human $date_time_mark)
+		##$PRINTF_cmd "%s \"%s\" %s %s\n" "$account" "$human_date_time" $full_inc $hsize
+		#$PRINTF_cmd "%s \"%s\" %s %s\n" "$account" "$date_time_mark" $full_inc $hsize
+	#done
+	#)
+
+	return 0
+}
+
+#
+## Get accounts in order of need backup
+function get_accounts_in_order_of_need_backup(){
+	#Accts. in order of need backup, storage-based backup information
+	accounts_in_storage=$(
+	  $FIND_cmd -P "${WORKDIR}" -maxdepth 2 -mindepth 1 \
+		-type l -regex '.*/LAST' -printf "%h/%l\n" |\
+		get_from_backup_file_name DATE_TIME_MARK ACCOUNT |\
+		$SORT_cmd | $AWK_cmd '{print $2}'
+	)
+	#Accts. in ldap
+	accounts_in_ldap=$(ldap_get_groups ; ldap_get_accts)
+
+	#Accts. without backup (diff btw. accounts_in_ldap and accounts_in_storage)
+	accounts_without_bk=$(
+		diff -u <(for a in $accounts_in_ldap;do echo $a;done|sort) \
+		  <(for a in $accounts_in_storage;do echo $a;done|sort)| \
+		$GREP_cmd '^-[^-]'| $SED_cmd 's/^-//')
+
+	#First accounts without backup, then accounts in order of need backup 
+	echo $accounts_without_bk $accounts_in_storage
+}
+
+#
+## Do a backup account
+function backup_account(){
+	local account="$1"
+	local mode="$2"
+	local query="$3"
+	local init_tt=$(time_cur_tt)
+	local user_bk_dir=${WORKDIR}/$account
+	[ ! -d "$user_bk_dir" ] && mkdir -p "$user_bk_dir"
+	local backup_file; backup_file=$(backup_create_file \
+		$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
+	mkdir -p ${backup_file}.files #Temporary files
+
+	#Remove all if error, or return
+	trap "[ $? -ne 0 ] && rm -f $backup_file; rm -rf $backup_file.files;trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
+
+	debug "$account - START $mode backup ..."
+
+	#Ldap backup
+	local ldap_bkf=${backup_file}.files/$LDAP_FILE_IN_TAR
+	debug "$account - Doing ldap backup ..."
+	[ -z "$SIMULATE" ] && { zimbra_ldap_backup "$account" $ldap_bkf || return 1 ;}
+	debug "$account - ldap backup complete"
+
+	#Mailbox backup is dependent on the type of account
+	local mbox_bkf=${backup_file}.files/$MAILBOX_FILE_IN_TAR
+	local ac_type;ac_type=$(cat $ldap_bkf|ldif_analysis_account_type $ldap_bkf) 
+	if [ "$ac_type" != ACCOUNT ];then 
+		debug "$account - No a mail account. Skipping mailbox backup." 
+	else
+		#Mailbox backup
+		local mailhost;mailhost=$(cat $ldap_bkf|ldif_analysis_get_att zimbraMailHost)
+		[ -z "$mailhost" ] && \
+			debug "$account - No zimbraMailHost ldap attribute." && return 1
+		debug "$account - Doing mailbox backup ..."
+		[ -z "$SIMULATE" ] && { zimbra_mailbox_backup "$account" "$mailhost" \
+			"$query" $mbox_bkf  || return 1 ;}
+		debug "$account - mailbox backup complete"
+	fi
+
+	#Final backup file
+	[ -s "$ldap_bkf" ] && \
+		$TAR_cmd -r -C $(dirname $ldap_bkf) -f $backup_file $(basename "$ldap_bkf")
+	[ -s "$mbox_bkf" ] && \
+		$TAR_cmd -r -C $(dirname $ldap_bkf) -f $backup_file $(basename "$mbox_bkf")
+
+	#Link to last backup
+	if [ -f $backup_file ];then
+		$LN_cmd -fs ${backup_file##*/} ${backup_file%/*}/LAST
+		debug "$account - END in $(( $(time_cur_tt) - $init_tt ))secs," \
+			"using $($DU_cmd -h $backup_file|$AWK_cmd '{print $1}')"
+	fi
+	return 0
+}
+
+backup_account_incremental()
+{
+	local account="$1"
+	local mode="$2"
 	
-	exit 0
+	local last_from=$(get_account_date_time_mark_last_backup "$account")
+
+	if [ -z "$last_from" ]; then
+		if [ "$DO_FULL_IF_NO_PREV_INC" = yes ];then
+			debug "$account - No previous inc. backup. Doing FULL..."
+			backup_account $account $backup_dir $FULL_MARK
+			return 0
+		else
+			debug "$account - No previous backup. Incremental cancelled. Use -t for force full."
+			return 0
+		fi
+	else
+		passed_secs=$(( $(time_cur_tt) - $(time_cnv_date_time_mark_to_tt $last_from) ))
+		query="query=after:-$(( passed_secs / 60 ))mi" 
+		debug "$account - Last backup from "$(human_date_time --date="now - ${passed_secs}secs")" ..."
+		backup_account $account $backup_dir $mode "$query" 
+		return 0
+	fi
 }
 
-
-restore_alias()
+#
+## Restore account
+restore_account()
 {
-	for BKP in $(grep -e "^alias-"  $WORKDIR/sessions.txt); do
-		SESSAOCONTA=$(echo $BKP | awk -F: '{print $1}')
-		MAIL=$(echo $BKP | awk -F: '{print $2}')
-		$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff	
-	done
-}
+	local account="$1"
+	local date_time_mark_until="$2"
+	
+	#restore files
+	local restore_files
+	restore_files=$(get_backup_cycles_older_than $account $date_time_mark_until)
+	[ -z "$restore_files" ] && \
+		debug "$account - No backup files available for restoration" && return 0
+	local last_backup;last_backup=$(last_word "$restore_files")
 
+	#Ldap data from last backup
+    local ldap_data;ldap_data=$($TAR_cmd -O -xf $last_backup $LDAP_FILE_IN_TAR)
 
-restore_distribution_list()
-{
-        for BKP in $(grep -e "^distlist-"  $WORKDIR/sessions.txt); do
-                SESSAOCONTA=$(echo $BKP | awk -F: '{print $1}')
-                MAIL=$(echo $BKP | awk -F: '{print $2}')
-                $(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff
-        done
-}
-
-backup_alias()
-{
-COUNT=0
-LISTATODASCONTAS=$(mktemp)
-$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(objectclass=zimbraAlias)" uid | grep ^uid | awk '{print $2}' > "$LISTATODASCONTAS"
-SESSAO="alias-"$(date  +%Y%m%d%H%M%S)
-echo "SESSAO: $SESSAO iniciada em $(date)" >> $WORKDIR/sessions.txt
-TEMPDIR=$(mktemp -d $WORKDIR/XXXX)
-for MAIL in $(cat $LISTATODASCONTAS); do
-        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(&(uid=$MAIL)(objectclass=zimbraAlias))" > $TEMPDIR/$MAIL.ldiff
-	echo $SESSAO:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
-        let COUNT++
-done
-mv "$TEMPDIR" "$WORKDIR/$SESSAO" && rm -rf "$TEMPDIR"
-echo "SESSAO: $SESSAO concluída em $(date)" >> $WORKDIR/sessions.txt
-
-echo "$(date) - Efetuados backup de $COUNT conta(s)" >> $LOGFILE
-
-exit 0
-
-}
-
-
-####Ate aqui merged
-
-
-rotate_backup ()
-{
-	cp $WORKDIR/sessions.txt $WORKDIR/sessions.txt.old
-
-	grep SESS $WORKDIR/sessions.txt | awk '{print $2}'| while read line; do
-		if [ "$(echo ${line} | cut -d- -f2)" -lt "$1" ]; then
-		   [ -d $WORKDIR/"${line}" ] && rm -rf $WORKDIR/"${line}" && echo Exclude session "${line}"
-		   grep -v "${line}" $WORKDIR/sessions.txt > $WORKDIR/.sessions.txt
-		   mv $WORKDIR/.sessions.txt $WORKDIR/sessions.txt
+	#LDAP restore. Only add operation. 
+	#I think deletion is not secure implement. Modifications based on the 
+	# differences will be quite a challenge. I need you!
+	for dn in $(echo "$ldap_data" |ldif_analysis_get_att dn y);do
+		if ! ldap_dn_exists "$dn" ;then 
+			debug "$account - Adding ldap entry: $dn"
+			[ -z "$SIMULATE" ] && \
+				echo "$ldap_data"|ldif_analysis_get_entry "$dn" |ldap_add 
 		fi
 	done
 
-	rm $WORKDIR/.sessions.txt -f
-	exit 0
+	#Account type
+	local ac_type;ac_type=$(echo "$ldap_data"| ldif_analysis_account_type)
+	[ "$ac_type" != ACCOUNT ] && \
+		debug "$account - No a mail account. Skipping mailbox restore." && return 0
+
+	#Mailbox restore
+	local mailhost
+	mailhost=$(ldap_get_mailbox_atts "$account" "zimbraMailHost"|ldif_analysis_get_att zimbraMailHost)
+	[ -z "$mailhost" ] && error "$account - Can not get zimbraMailHost ldap att." && return 1
+	debug "$account - Mailbox restore started"
+	local human_date_time
+	while read date_time_mark full_inc tar_bkfile;do 
+		[ -z "$date_time_mark" ] && continue
+		human_date_time=$(time_cnv_date_time_mark_to_human $date_time_mark)
+		debug "$account - Restauring from $human_date_time $full_inc"
+		if [ -z "$SIMULATE" ] && \
+		  $TAR_cmd -tf $tar_bkfile $MAILBOX_FILE_IN_TAR >/dev/null 2>&1;then
+			$TAR_cmd -O -xf $tar_bkfile $MAILBOX_FILE_IN_TAR| \
+				zimbra_mailbox_restore "$account" "$mailhost" 
+		fi
+	done<<-BACKUPS
+		$( echo "$restore_files"| 
+			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH )
+		BACKUPS
+	debug "$account - Mailbox restore end"
 }
+
+#
+## Delete old backups of account
+delete_old_backups_of_account()
+{
+	local account="$1"
+	local date_time_mark_until="$2"
+	
+	debug "$account - START deleting old backups"
+
+	if [ -z "$(get_backups_account "$account" $position)" ];then
+		debug "$account - Account does not have backups."
+		return 0
+	fi
+
+	while read date_time_mark full_inc bkfile ;do 
+		[ -z "$date_time_mark" ] && continue
+		human_date_time=$(time_cnv_date_time_mark_to_human $date_time_mark)
+		debug "$account - Deleting backup from $human_date_time $full_inc"
+		[ -z "$SIMULATE" ] && $RM_cmd -f "$bkfile"
+	done<<-BACKUP_LIST
+		$(get_backup_cycles_older_than $account $date_time_mark_until|\
+			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH )
+		BACKUP_LIST
+	debug "$account - END deleting old backups"
+}
+
+
+
+#
+## Return $INC_MARK or $FULL_MARK according to the need for a full 
+## or incremental backup.
+really_need_a_backup()
+{
+	local account="$1"
+	local do_full_without_full_from_sec="$2"
+	local do_inc_without_inc_from_sec="$3"
+
+
+	[ -z "$do_full_without_full_from_sec" -a -z "$do_inc_without_inc_from_sec" ] && \
+		return 1
+
+	local last_full_tm
+	last_full_tm=$(get_date_time_mark_last_full_backup "$account")
+
+	#We need a full backup?
+	if [ -n "$do_full_without_full_from_sec" ];then
+		#If we not have a previous full, we need it
+		[ -z "$last_full_tm" ] && debug "$account - No previous full backup. Doing.." && \
+			echo FULL_BACKUP && return 0
+		
+		local last_full_tt=$(time_cnv_date_time_mark_to_tt $last_full_tm)
+		#If we have a very old full backup. We need a new copy
+		if [ $(( $(time_cur_tt) - $last_full_tt )) -ge $do_full_without_full_from_sec ];then
+			debug "$account - Last full backup too old. " \
+				"$( time_cnv_date_time_mark_to_human $last_full_tm)"
+			echo FULL_BACKUP && return 0 
+		fi
+	fi
+
+	#We need a inc backup?
+	if [ -n "$do_inc_without_inc_from_sec" ];then
+		local last_inc_tm=$(get_date_time_mark_last_inc_backup $account)
+		#If we not have a previous inc, we can consider the last full how a previous
+		[ -z "$last_inc_tm" -a -z "$last_full_tm" ] && \
+			debug "$account - There is not previous inc. or full backup for calculation." && \
+			debug "$account - Continuing with incremental backup." && \
+			echo INC_BACKUP && return 0
+		[ -z "$last_inc_tm" ] && last_inc_tm=$last_full_tm && \
+			debug "$account - No previous inc. backup. Calculating from last full $last_full_tm"
+		local last_inc_tt=$(time_cnv_date_time_mark_to_tt $last_inc_tm)
+		#If we have a very old inc backup. We need a new copy
+		if [ $(( $(time_cur_tt) - $last_inc_tt )) -ge $do_inc_without_inc_from_sec ];then
+			debug "$account - Last inc. backup too old" \
+				"$( time_cnv_date_time_mark_to_human $last_inc_tm)"
+			echo INC_BACKUP && return 0 
+		fi
+	fi
+	
+	debug "$account - Last full: $( time_cnv_date_time_mark_to_human $last_full_tm)" 
+	[ -n "$last_inc_tm" ] && \
+		debug "$account - Last inc.: $( time_cnv_date_time_mark_to_human $last_inc_tm)" 
+	debug "$account - Don't need a new backup."
+	return 1
+}
+
+
+################################################################################
+# OTHER functions ##############################################################
+
+#
+##Check if arg. is a number
+function is_a_number(){
+	echo $1|$EGREP_cmd '^[0-9]$'
+}
+
+#
+##Get last word in arguments
+function last_word(){
+	echo "$@" |$SED_cmd 's/ /\n/g'|$SED_cmd '/^$/d'|$SED_cmd -n '$p'
+}
+
 
 ###### MAIN ############
 # Here the code loads the config file
 source /etc/zmbkpose/zmbkpose.conf
 
-if ! [ -z "$BACKUPUSER" ]; then
-	if [ "$(id -u)" != "$(id -u $BACKUPUSER)" ]; then
-		echo "You need to be $BACKUPUSER to run this script"
-		exit 0
-	fi
-else
-	echo "You need to define the variable BACKUPUSER"
-	exit 0
-fi
+#Trap INT, TERM signals, for close child process (util with parallel backups)
+trap "kill -s SIGTERM -- 0" SIGINT SIGTERM
 
-if ! [ -z "$WORKDIR" ]; then
-        if ! [ -d "$WORKDIR" ]; then
-                echo "The directory $WORKDIR doesn't exist"
-                exit 0
-        fi
-else
-        echo "You need to define the variable WORKDIR"
-        exit 0
-fi
+[ -z "$AWK_cmd" ] && AWK_cmd=$(which awk) || exit 1
+[ -z "$CURL_cmd" ] && CURL_cmd=$(which curl) || exit 1
+[ -z "$DATE_cmd" ] && DATE_cmd=$(which date) || exit 1
+[ -z "$DU_cmd" ] && DU_cmd=$(which du) || exit 1
+[ -z "$EGREP_cmd" ] && EGREP_cmd=$(which egrep) || exit 1
+[ -z "$FIND_cmd" ] && FIND_cmd=$(which find) || exit 1
+[ -z "$GREP_cmd" ] && GREP_cmd=$(which grep) || exit 1
+[ -z "$LDAPADD_cmd" ] && LDAPADD_cmd=$(which ldapadd) || exit 1
+[ -z "$LDAPDELETE_cmd" ] && LDAPDELETE_cmd=$(which ldapdelete) || exit 1
+[ -z "$LDAPSEARCH_cmd" ] && LDAPSEARCH_cmd=$(which ldapsearch) || exit 1
+[ -z "$LN_cmd" ] && LN_cmd=$(which ln) || exit 1
+[ -z "$PRINTF_cmd" ] && PRINTF_cmd=$(which printf) || exit 1
+[ -z "$RM_cmd" ] && RM_cmd=$(which rm) || exit 1
+[ -z "$SED_cmd" ] && SED_cmd=$(which sed) || exit 1
+[ -z "$SORT_cmd" ] && SORT_cmd=$(which sort) || exit 1
+[ -z "$TAR_cmd" ] && TAR_cmd=$(which tar) || exit 1
+[ -z "$UNIQ_cmd" ] && UNIQ_cmd=$(which uniq) || exit 1
+[ -z "$READLINK_cmd" ] && READLINK_cmd=$(which readlink) || exit 1
 
-if [ -z "$ADMINUSER" ]; then
-        echo "You need to define the variable ADMINUSER"
-        exit 0
-fi
+[ -z "$WORKDIR" ] && \
+	error "CONFIG: You need to define WORKDIR" && exit 1
+[ ! -d "$WORKDIR" ] && \
+	error "The directory $WORKDIR doesn't exist" && exit 1
 
-if [ -z "$ADMINPASS" ]; then
-        echo "You need to define the variable ADMINPASS"
-        exit 0
-fi
+[ -z "$ADMINUSER" ] && \
+	error "CONFIG: You need to define the variable ADMINUSER" && \
+	exit 1
 
-if [ -z "$LDAPMASTERSERVER" ]; then
-        echo "You need to define the variable LDAPMASTERSERVER"
-        exit 0
-fi
+[ -z "$ADMINPASS" ] && \
+	echo "CONFIG: You need to define the variable ADMINPASS" && \
+	exit 1
 
-if [ -z "$LDAPZIMBRADN" ]; then
-        echo "You need to define the variable LDAPZIMBRADN"
-        exit 0
-fi
+[ -z "$LDAPMASTERSERVER" ] && \
+	echo "CONFIG:You need to define the variable LDAPMASTERSERVER" && \
+	exit 1
 
-if [ -z "$LDAPZIMBRAPASS" ]; then
-        echo "You need to define the variable LDAPZIMBRAPASS"
-        exit 0
-fi
+[ -z "$LDAPZIMBRADN" ] && \
+	echo "You need to define the variable LDAPZIMBRADN" && \
+	exit 1
 
-if [ -z "$LOGFILE" ]; then
-        echo "You need to define the variable LOGFILE"
-        exit 0
-fi
+[ -z "$LDAPZIMBRAPASS" ] && \
+	echo "You need to define the variable LDAPZIMBRAPASS" && \
+	exit 1
 
 # Criticize the parameters passed on the command line
-
-case "$1" in
-"-f" )
-	if [ $PARALLEL_SUPPORT -eq 1  ];then
-			echo "Running the parallel backup"
-			backup_all_accounts_parallel
-		else
-			if [ -z "$2" ]; then
-				backup_all_accounts
-			else
-				if [ -z "$3" ]; then
-					backup_accounts $2
-				fi
-				echo "Incorrect $@ params. Read --help."
-       		 		show_help
-		fi
-	fi
-;;
-"-i" )
-	if [ -z "$2" ]; then
-		incremental_all_accounts
-	else
-		if [ -z "$3" ]; then
-			incremental_accounts $2
-		fi
-		echo "Incorrect $@ params. Read the --help."
-        	show_help
-	fi
-;;
-"-l" )
-        if [ -z "$2" ]; then
-                list_sessions
-	else
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	fi
-;;
-"-r" )
-        if [ -z "$2" ]; then
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	else
-		if [ -z "$4" ]; then
-			restore_accounts $2 $3
-		else
-                	echo "Incorrect $@ params. Read the --help."
-	                show_help
-		fi
-	fi
-;;
-"-restoreAccount" )
-        if [ -z "$2" ]; then
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	else
-		if [ -z "$3" ]; then
-			restore_LDAP_account $2
-		else
-			if [ "$3" = "--LDAPOnly" ]; then
-				restore_LDAP_account $2 $4
-			else
-	                	echo "Incorrect $@ params. Read the --help."
-		                show_help
+while [ -n "$1" ];do
+	case "$1" in
+		(-a) #Accounts
+			[ -z "$2" ] && show_help && exit 
+			accounts=${2//,/ } #Multiple accounts comma separated
+			shift 2
+		;;
+		(-c) #For backups, operates only with a certain number of accounts. 
+			[ -z "$2" ] && show_help && exit 
+			account_limit=$2
+			shift 2
+		;;
+		(-C) #Similar to "-c", backups up to reach the time "time"
+			[ -z "$2" ] && show_help && exit 
+			if ! time_limit=$( cnv_time_expr_to_secs $2 );then
+				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
+				show_help
+				exit 1
 			fi
-		fi
-	fi
-	
-;;
-"--restoreAllAccounts" )
-	restore_all_accounts_parallel
-;;
-"--backupDistributionList" )
-        backup_distribution_list
-;;
-"--backupAlias" )
-        backup_alias
-;;
-"--restoreAlias" )
-	restore_alias
-;;
-"--restoreDistributionList" )
-	restore_distribution_list
-;;
-"-d" )
-	if [ -z "$2" ]; then
-	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-		show_help
-		exit 0
-	fi
-	if [ $2 -eq $2 2> /dev/null ]; then
-		if [ -z "$3" ]; then
-		  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 days"`
-		else
-			case "$3" in
-			"weeks" )
-			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 weeks"`
-			;;
-			"months" )
-			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 months"`
-			;;
-			* )
-		          echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-         		  show_help
-			  exit 0
-			;;
+			shift 2
+		;;
+		(-d) #Delete old backups
+			[ -z "$2" ] && show_help && exit 
+			action=DELETE_OLD_BACKUPS
+			if ! secs_to_retain=$( cnv_time_expr_to_secs $2 );then
+				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
+				show_help
+				exit 1
+			fi
+			shift 2
+			del_date_time_mark_until=$(time_cur_date_time_mark \
+				--date="$((time_cur_tt - ${secs_to_retain} ))secs")
+		;;
+		(-e) #Wait a time between each backup of an account
+			[ -z "$2" ] && show_help && exit 
+			if ! time_btw_bks=$( cnv_time_expr_to_secs $2 );then
+				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
+				show_help
+				exit 1
+			fi
+			shift 2
+		;;
+		(-f) #Full account backup
+			action=FULL_BACKUP
+			shift 1
+		;;
+		(-F) #Do a full backup, only if the accounts don't have a full backup from "time"
+		   # or whithout a full backup.
+			[ -z "$2" ] && show_help && exit 
+			if ! do_full_without_full_from_secs=$( cnv_time_expr_to_secs $2 );then
+				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
+				show_help
+				exit 1
+			fi
+			action=COND_BACKUP
+			shift 2
+		;;
+		(-i) #Incremental account backup
+			action=INC_BACKUP
+			shift 1
+		;;
+		(-I) #Do a inc. backup, only if the accounts don't have a inc. or 
+		   #  full backup from "time".
+			[ -z "$2" ] && show_help && exit 
+			if ! do_inc_without_inc_from_secs=$( cnv_time_expr_to_secs $2 );then
+				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
+				show_help
+				exit 1
+			fi
+			action=COND_BACKUP
+			shift 2
+		;;
+		(-h|--help) #Show help
+			show_help
+			exit 0
+		;;
+		(-l|-m|-n) #List account backups info
+			case "$1" in
+				(-l) action=GET_BACKUPS_INFO;;
+				(-m) action=GET_FIRST_BACKUP_INFO;;
+				(-n) action=GET_LAST_BACKUP_INFO;;
 			esac
-		fi
-		rotate_backup $OLDEST
-	else
-	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+			shift 1
+		;;
+		(-p) #Backups in parallel, with a maximum of "n" instances
+			[ -z "$2" ] && show_help && exit 
+			PARALLEL_SUPPORT=1
+			if ! MAX_PARALLEL_PROCESS=$(is_a_number $2);then
+				error "Incorrect arg. especification for $1. See help."
+				show_help
+				exit 1
+			fi
+			shift 2
+		;;
+		(-r) #Restore accounts from backups(last full + later incrementals)
+			action=RESTORE
+			shift 1
+		;;
+		(-R) #Restore accounts from the nearest backup before the 
+		   # ( now - lapse_specified_time )
+		   # Time can be expresed in format $DATE_TIME_MARK_FORMAT or : 
+		   # n[mhdwM], where n is a number, "m" for minutes, "h" for hours, "d" 
+		   # for days, "w" for weeks, and "M" for months.
+			[ -z "$2" ] && show_help && exit 
+			if restore_until_secs=$( cnv_time_expr_to_secs $2 );then
+				rest_date_time_mark_until=$(time_cur_date_time_mark --date="-${restore_until_secs}secs")
+			elif ! rest_date_time_mark_until=$(is_date_time_mark $2);then
+				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
+				show_help
+				exit 1
+			fi
+			action=RESTORE
+			shift 2
+		;;
+		(-s) #Simulation of operations as if they really do
+			SIMULATE=yes
+			shift 1
+		;;
+		(-t) #Does full backup if there is no previous incremental
+			DO_FULL_IF_NO_PREV_INC=yes
+			shift 1
+		;;
+		(-u) #If error, continue with another account
+			CONT_ON_ERROR=1
+			shift 1
+		;;
+		(*) #Error
+			error "Incorrect parameters $1. See help."
+			show_help
+			exit 1
+		;;
+	esac
+done
+
+
+#Do Action
+case $action in
+    (FULL_BACKUP|INC_BACKUP|COND_BACKUP) #Backups
+		#If not accounts passed, we use all accounts
+		[ -z "$accounts" ] && \
+			debug "Geting accounts in order of need backup." && \
+			accounts=$(get_accounts_in_order_of_need_backup)
+		debug "Analizing $(echo $accounts |wc -w) accounts"
+
+		#For each account
+		init_tt=$(time_cur_tt) ; bk_count=0
+		for account in $accounts;do 
+			#Account exists?
+			[ -z "$(ldap_get_mailbox_atts "$account")" ] && \
+				debug "$account - account does not exists in zimbra. Skipping" && \
+				continue
+
+			#There are backup conditions?
+			if [ -n "$do_full_without_full_from_secs" -o \
+				 -n "$do_inc_without_inc_from_secs" ];then
+				if ! new_action=$(really_need_a_backup $account \
+						"$do_full_without_full_from_secs" \
+						"$do_inc_without_inc_from_secs");then
+					continue
+				fi
+				[ -n "$new_action" ] && action=$new_action
+			fi
+
+			#FULL or INC. backup?
+			if [ "$action" = FULL_BACKUP ];then
+				do_FUNCTION=backup_account ; mode=$FULL_MARK
+			elif [ "$action" = INC_BACKUP ];then
+				do_FUNCTION=backup_account_incremental ; mode=$INC_MARK
+			fi
+
+			#Secuencial, or parallel backup?
+			if [ "$PARALLEL_SUPPORT" = 1 ];then #Parallel 
+				until [ "$(jobs -r|wc -l)" -lt $MAX_PARALLEL_PROCESS ]; do sleep 5 ; done
+				$do_FUNCTION $account $mode &
+			else #Secuencial
+				$do_FUNCTION $account $mode
+			fi
+
+			let bk_count++ || true ; 
+
+			#Time limit?
+			if [ -n "$time_limit" ] && \
+			  [ $(( $(time_cur_tt) - $init_tt )) -ge "$time_limit" ];then 
+				debug "time limit reached (-C ${time_limit}s). $bk_count backups performed"
+				break 
+			fi
+
+			#Account numbers limit?
+			if [ -n "$account_limit" ] && [ $bk_count -eq $account_limit ];then 
+				debug "accounts limit reached (-c $account_limit). $bk_count backups performed"
+				break 
+			fi
+
+			#Wait between backups?
+			[ -n "$time_btw_bks" ] && \
+				debug "Waiting $time_btw_bks secs..." && sleep $time_btw_bks
+		done
+		wait #Waiting for background processes
+    ;;
+
+	(GET_BACKUPS_INFO|GET_FIRST_BACKUP_INFO|GET_LAST_BACKUP_INFO) #Get info from backups 
+
+		#Specific information backup
+		position=any
+		case $action in 
+			(GET_FIRST_BACKUP_INFO) position=FIRST;;
+		 	(GET_LAST_BACKUP_INFO)  position=LAST;;
+		esac
+		#If not accounts passed, we use all accounts
+		[ -z "$accounts" ] && accounts=$(get_accounts_in_backups)
+
+		#For each account
+		#for account in $accounts;do
+			get_account_backups_info $position $accounts
+		#done
+    ;;
+
+	(RESTORE) #Restore accounts from backups
+		#If not accounts passed, we use all accounts
+		[ -z "$accounts" ] && accounts=$(ldap_get_groups ; ldap_get_accts)
+	
+		[ -z "$rest_date_time_mark_until" ] && \
+			rest_date_time_mark_until=$(time_cur_date_time_mark) 
+
+		for account in $accounts;do
+			restore_account $account $rest_date_time_mark_until
+		done
+    ;;
+
+	(DELETE_OLD_BACKUPS) #Delete old backups
+		#If not accounts passed, we use all accounts
+		[ -z "$accounts" ] && accounts=$(get_accounts_in_backups)
+
+		for account in $accounts;do
+			delete_old_backups_of_account $account $del_date_time_mark_until
+		done
+    ;;
+
+	(*) #action needed
+		error "You must specify an action"
 		show_help
-		exit 0
-	fi
-;;
-
-* )
-	echo "Incorrect parameters $@. See help."
-	show_help
-;;
+		exit 1
+    ;;
 esac
-exit 0
 
-# Ações do script
 
-# Listar opções de Uso
-
-# Listar sessoes de backups armazenados
-
-# Backup FULL de todas as contas
-
-# Backup FULL de uma ou mais contas especificadas na linha de comando
-
-# Restore do conteudo de uma ou mais contas especificadas na linha de comando
-
-# Restore FULL (atributos e conteudo) de uma ou mais contas especificadas na linha de comando
-
-# Restore FULL de todas as contas (PEDIR CONFIRMAÇÕES. ALTÍSSIMO RISCO.)
-
-# Exclui a SESSION especificada na linha de comandos (para administração da janela de retencao)
