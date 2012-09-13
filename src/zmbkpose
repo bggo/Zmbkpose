@@ -443,7 +443,6 @@ function get_backups_account(){
 function get_backup_cycles_older_than(){
 	local account="$1"
 	local date_time_mark_until="$2"
-	echo $date_time_mark_until
 	[ -z "$date_time_mark_until" ] && return 1
 
 	while read date_time_mark full_inc bkfile ;do 
@@ -723,7 +722,7 @@ restore_account()
 	local last_backup;last_backup=$(last_word "$restore_files")
 
 	#Ldap data from last backup
-    local ldap_data;ldap_data=$($TAR_cmd -O -xf $last_backup $LDAP_FILE_IN_TAR)
+	local ldap_data;ldap_data=$($TAR_cmd -O -xf $last_backup $LDAP_FILE_IN_TAR)
 
 	#LDAP restore. Only add operation. 
 	#I think deletion is not secure implement. Modifications based on the 
