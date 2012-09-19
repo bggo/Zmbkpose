@@ -450,11 +450,11 @@ function get_backup_cycles_older_than(){
 		#Skip backups after to end date
 		[ $date_time_mark -gt $date_time_mark_until ] && continue
 		#Search for start of cycle
-		if [ -z "$cycles_to_maintain_reached" -a $full_inc != FULL ];then
+		if [ -z "$cycles_to_ignore" -a $full_inc != FULL ];then
 			continue
-		elif [ -z "$cycles_to_maintain_reached" ];then
+		elif [ -z "$cycles_to_ignore" ];then
 			#Here is the beginning of cycle one full backup
-			cycles_to_maintain_reached=y
+			cycles_to_ignore=y
 			continue
 		fi
 		#Older backup files
@@ -476,9 +476,10 @@ function get_last_backup_cycle_prior_to(){
 
 	while read date_time_mark full_inc bkfile ;do 
 		[ -z "$date_time_mark" ] && continue
+		#Skip backups after to end date
 		[ $date_time_mark -gt $date_time_mark_until ] && continue
 		echo $bkfile
-		[ $full_inc = FULL ] && break
+		[ $full_inc = FULL ] && break # Start of cycle
 	done<<-BACKUP_LIST | $SORT_cmd
 		$(get_backups_account $account "" DESC | 
 			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH
@@ -713,10 +714,9 @@ restore_account()
 {
 	local account="$1"
 	local date_time_mark_until="$2"
-	
 	#restore files
 	local restore_files
-	restore_files=$(get_backup_cycles_older_than $account $date_time_mark_until)
+	restore_files=$(get_last_backup_cycle_prior_to $account $date_time_mark_until)
 	[ -z "$restore_files" ] && \
 		debug "$account - No backup files available for restoration" && return 0
 	local last_backup;last_backup=$(last_word "$restore_files")
