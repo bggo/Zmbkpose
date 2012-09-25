@@ -171,6 +171,10 @@ if ! [ $STATUS = 0 ]; then
 	echo ""
 	echo "You're missing some dependencies OR they are not on $ZIMBRA_USER's PATH."
 	echo "Please correct the problem and run the installer again."
+    case "`lsb_release -i`" in
+        Ubuntu|ubuntu) echo -e "Deps can be fixed with the following command: \n\tapt-get install curl grep coreutils";;
+        RedHat|redhat|CentOS|centos) echo -e "Deps can be fixed with the following command: \n\tyum install curl [..]";; # FIXME don't know centos packages
+    esac
 	exit $STATUS
 fi
 # Done checking deps
