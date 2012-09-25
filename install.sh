@@ -49,9 +49,9 @@ fi
     
 
 # Try to guess missing settings as best as we can
-test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - zimbra -c zmhostname`
+test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - $ZIMBRA_USER -c zmhostname`
 test -z $ZIMBRA_ADDRESS  && ZIMBRA_ADDRESS=`grep $ZIMBRA_HOSTNAME /etc/hosts|awk '{print $1}'`
-test -z $ZIMBRA_LDAPPASS && ZIMBRA_LDAPPASS=`su - zimbra -c "zmlocalconfig -s zimbra_ldap_password"|awk '{print $3}'`
+test -z $ZIMBRA_LDAPPASS && ZIMBRA_LDAPPASS=`su - $ZIMBRA_USER -c "zmlocalconfig -s zimbra_ldap_password"|awk '{print $3}'`
 if [ -z $ZIMBRA_BKPDIR ]; then
 	test -d $ZIMBRA_DIR/backup && ZIMBRA_BKPDIR=$ZIMBRA_DIR/backup
 	test -d /backup && ZIMBRA_BKPDIR=/backup
