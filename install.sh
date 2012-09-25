@@ -39,6 +39,14 @@ ERR_OK="0"			# No error (normal exit)
 ERR_NOBKPDIR="1"		# No backup directory could be found
 ERR_NOROOT="2"			# Script was run without root privileges
 ERR_DEPNOTFOUND="3"		# Missing dependency
+ERR_NOZIBRAUSER="4"	# Missing zimbra user
+
+if ! id -u $ZIMBRA_USER > /dev/null 2>&1; then
+	echo "No '$ZIMBRA_USER' user exists, either Zimbra is not installed or uses a non standard username."
+    echo "If the latter, please edit $0 and change the ZIBRA_USER variable."
+	exit $ERR_NOZIBRAUSER
+fi
+    
 
 # Try to guess missing settings as best as we can
 test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - zimbra -c zmhostname`
