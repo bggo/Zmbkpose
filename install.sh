@@ -95,7 +95,7 @@ STATUS=0
 MYDIR=`dirname $0`
 test -f $MYDIR/src/zmbkpose      || STATUS=$ERR_MISSINGFILES
 test -f $MYDIR/etc/zmbkpose.conf || STATUS=$ERR_MISSINGFILES
-if ! [ $STATUS = 0 ]; then
+if [ ! $STATUS = 0 ]; then
 	printf '[ERROR]\n'
 	echo "Some files are missing. Please re-download the Zmbkpose installer."
 	exit $STATUS
