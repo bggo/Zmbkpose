@@ -40,6 +40,7 @@ ERR_NOBKPDIR="1"		# No backup directory could be found
 ERR_NOROOT="2"			# Script was run without root privileges
 ERR_DEPNOTFOUND="3"		# Missing dependency
 ERR_NOZIBRAUSER="4"	# Missing zimbra user
+ERR_MISSINGFILES="5"	# Missing files
 
 if ! id -u $ZIMBRA_USER > /dev/null 2>&1; then
 	echo "No '$ZIMBRA_USER' user exists, either Zimbra is not installed or uses a non standard username."
@@ -95,7 +96,7 @@ STATUS=0
 MYDIR=`dirname $0`
 test -f $MYDIR/src/zmbkpose      || STATUS=$ERR_MISSINGFILES
 test -f $MYDIR/etc/zmbkpose.conf || STATUS=$ERR_MISSINGFILES
-if [ ! $STATUS = 0 ]; then
+if ! [ $STATUS = 0 ]; then
 	printf '[ERROR]\n'
 	echo "Some files are missing. Please re-download the Zmbkpose installer."
 	exit $STATUS
