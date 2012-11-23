@@ -57,7 +57,7 @@ show_help ()
     -l,-m,-n        List all backups info(-l), only first backup(-m) or last(-n)
     -p n            Backups in parallel, with a maximum of "n" instances
     -r              Restore accounts from last full and later incrementals
-    -R time         Restore accounts from the nearest backup before the now-time
+    -R time         Restore accounts up to the point in cycle reached by now-time
     -s              Simulation of operations as if they really do
     -t              On incremental backup, do full is not previous incremental
     -u              On failure of a backup account, does not stop.
@@ -103,16 +103,17 @@ show_help ()
          Override PARALLEL_SUPPORT, and MAX_PARALLEL_PROCESS from config.
 
    zmbkpose -r [ -a mail1,mail2 mail3 ] [-s]
-         Restore from backups(last full + later incrementals) for all or 
+         Restore last backup cycle(last full + later incrementals) for all or 
           specific accounts.
 
    zmbkpose -R time [ -a mail1,mail2 mail3 ] [-s]
-         Restore all (or specific accounts) from the nearest backup before the
-          time specified. time can be:
+         Restore for all or specific accounts up to the point in cycle (full and later incs.)
+          reached by ( now - time ). time can be:
            * interval specified by "time FORMAT" (see below). The restore will be
-              from ( now - time ).
-           * date_time_mark internal format expresed by "date" 
+              up to ( now - time ).
+           * absolute time mark in internal format expresed by "date" 
               command using '$DATE_TIME_MARK_FORMAT' format.
+           * a dash (-) for restore all backups starting with the oldest
 
    time FORMAT:
    -----------
@@ -477,9 +478,10 @@ function get_last_backup_cycle_prior_to(){
 	while read date_time_mark full_inc bkfile ;do 
 		[ -z "$date_time_mark" ] && continue
 		#Skip backups after to end date
-		[ $date_time_mark -gt $date_time_mark_until ] && continue
+		[ $date_time_mark_until != '-' ] && [ $date_time_mark -gt $date_time_mark_until ] && 
+			continue
 		echo $bkfile
-		[ $full_inc = FULL ] && break # Start of cycle
+		[ $date_time_mark_until != '-' -a $full_inc = FULL ] && break # Start of cycle
 	done<<-BACKUP_LIST | $SORT_cmd
 		$(get_backups_account $account "" DESC | 
 			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH
@@ -720,6 +722,7 @@ restore_account()
 	[ -z "$restore_files" ] && \
 		debug "$account - No backup files available for restoration" && return 0
 	local last_backup;last_backup=$(last_word "$restore_files")
+	debug "$account - Using ldap data from backup $last_backup"
 
 	#Ldap data from last backup
 	local ldap_data;ldap_data=$($TAR_cmd -O -xf $last_backup $LDAP_FILE_IN_TAR)
@@ -1014,13 +1017,15 @@ while [ -n "$1" ];do
 			action=RESTORE
 			shift 1
 		;;
-		(-R) #Restore accounts from the nearest backup before the 
-		   # ( now - lapse_specified_time )
+		(-R) #Restore accounts up to the nearest backup before the ( now - 
+                   #   lapse_specified_time )
 		   # Time can be expresed in format $DATE_TIME_MARK_FORMAT or : 
 		   # n[mhdwM], where n is a number, "m" for minutes, "h" for hours, "d" 
 		   # for days, "w" for weeks, and "M" for months.
 			[ -z "$2" ] && show_help && exit 
-			if restore_until_secs=$( cnv_time_expr_to_secs $2 );then
+			if [ "$2" = - ] ;then
+				rest_date_time_mark_until=$2 #Rest. all backups starting with the oldest
+			elif restore_until_secs=$( cnv_time_expr_to_secs $2 );then
 				rest_date_time_mark_until=$(time_cur_date_time_mark --date="-${restore_until_secs}secs")
 			elif ! rest_date_time_mark_until=$(is_date_time_mark $2);then
 				error "Incorrect time especification for $1. See \"time FORMAT\" in help."
