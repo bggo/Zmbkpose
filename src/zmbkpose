@@ -39,6 +39,7 @@ DATE_TIME_MARK_FORMAT='%Y%m%d%H%M%S' #alphanumeric time sortable by the "sort" c
 CURL_args="-s -S -k"
 LDAP_FILE_IN_TAR=acct.ldif
 MAILBOX_FILE_IN_TAR=mailbox.tgz
+OSE_CONF="/etc/zmbkpose"
 
 show_help ()
 {
@@ -869,7 +870,7 @@ function last_word(){
 
 ###### MAIN ############
 # Here the code loads the config file
-source /etc/zmbkpose/zmbkpose.conf
+source $OSE_CONF/zmbkpose.conf
 
 #Trap INT, TERM signals, for close child process (util with parallel backups)
 trap "kill -s SIGTERM -- 0" SIGINT SIGTERM

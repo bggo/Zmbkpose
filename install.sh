@@ -218,6 +218,8 @@ install -o root -g root -m 755 -d $OSE_SRC
 ## Copy files
 install -o $ZMBKPOSE_USER -m 700 $MYDIR/src/zmbkpose $OSE_SRC
 install --backup=numbered -o $ZMBKPOSE_USER -m 600 $MYDIR/etc/zmbkpose.conf $OSE_CONF
+## Update OSE_CONF into the installed script
+sed -i "s|^OSE_CONF=.*|OSE_CONF=\"$OSE_CONF\"|" $OSE_SRC/zmbkpose
 
 printf "[OK]\n" 
 
