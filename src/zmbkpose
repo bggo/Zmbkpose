@@ -206,8 +206,10 @@ function ldif_analysis_get_att()
 {
 	local attribute="$1"
 	local multivalued="$2"
-	local sed_cmd='q;' ; [ -n "$multivalued" ] && sed_cmd=''
-	$SED_cmd -n -e "/^$attribute:/{p;$sed_cmd}"| $SED_cmd -r -e "s/^$attribute: ?//"
+	local sed_quit=';q' ; [ -n "$multivalued" ] && unset sed_quit
+	$SED_cmd -r -n -e "/^$attribute:/{N}" \
+		-e "/^$attribute: .*\n .*/{s/^$attribute: (.*)\n (.*)/\1\2/p$sed_quit}" \
+		-e "/^$attribute: .*\n[^ ].*/{s/^$attribute: (.*)\n[^ ].*/\1/p$sed_quit}"
 }
 
 #
