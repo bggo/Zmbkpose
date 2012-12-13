@@ -46,7 +46,12 @@ show_help ()
 	cat<<-EOF 
  Options:
     -a act[,act]... Operates on specific accounts. Default all.
+    --admuser user  Use \"user\" as admin user for access to mailboxes
+    --admpw pw      Use \"pw\" as admin user password for access to mailboxes
+    --bf file       Backup to a specific tar file(don't use WORKDIR) 
     -c n            Limits the number of accounts in backups to "n"
+    -chldaph        In the restore in a different host, try to change some 
+	                 attributes of LDAP for account work
     -C time         Similar to "-c", backups up to reach the time "time"
     -d time         Delete old backups, if them are "time" old
     -e time         Wait a time between each backup of an account
@@ -55,9 +60,14 @@ show_help ()
     -h              This help
     -i              Incremental backup
     -I time         Conditional inc. backup. If last inc backup is "time" old
+    --ldaph host    Use "host" as ldap master server (if you restore in 
+	                  another host, use --chldaph arg.)
+    --ldapdn dn     Use "dn" for login to ldap server
+    --ldappw pw     Use "pw" as password for login to ldap server
     -l,-m,-n        List all backups info(-l), only first backup(-m) or last(-n)
     -p n            Backups in parallel, with a maximum of "n" instances
     -r              Restore accounts from last full and later incrementals
+    --rf file       Restore from a specific tar backup file 
     -R time         Restore accounts up to the point in cycle reached by now-time
     -s              Simulation of operations as if they really do
     -t              On incremental backup, do full is not previous incremental
@@ -76,17 +86,21 @@ show_help ()
          The backups with * will be deleted. If removed oldest backups than Friday,
           (now - 1d) would remain an inconsistent backup.
 
-   zmbkpose -f [ -a mail1,mail2 mail3 ] [-s] [-c] [-C] [-e] [-u]
+   zmbkpose -f [ -a mail1,mail2 mail3 ] [-s] [-c] [-C] [-e] [-u] [-p n] [--bf file] \\
+            [--admuser user] [--admpw pw] [--ldaph host] [--ldapdn dn] [--ldappw pw]
          Full backup for all or specific accounts. 
 
-   zmbkpose -F time [ -a mail1,mail2 mail3 ] [-s] [-c] [-C] [-e] [-u]
+   zmbkpose -F time [ -a mail1,mail2 mail3 ] [-s] [-c] [-C] [-e] [-u] [-p n] [--bf file] \\
+            [--admuser user] [--admpw pw] [--ldaph host] [--ldapdn dn] [--ldappw pw]
          Full backup for all or specific accounts only if the accounts don't have a
           full backup from time. See "time FORMAT" below.
 
-   zmbkpose -i [ -a mail1,mail2 mail3 ] [-c] [-C] [-e] [-s] [-t] [-u]
+   zmbkpose -i [ -a mail1,mail2 mail3 ] [-c] [-C] [-e] [-s] [-t] [-u] [-p n] [--bf file] \\
+            [--admuser user] [--admpw pw] [--ldaph host] [--ldapdn dn] [--ldappw pw]
          Incremental backup (or full if no previous) for all or specific accounts.
 
-   zmbkpose -I time [ -a mail1,mail2 mail3 ] [-c] [-C] [-e] [-s] [-t] [-u]
+   zmbkpose -I time [ -a mail1,mail2 mail3 ] [-c] [-C] [-e] [-s] [-t] [-u] [-p n] [--bf file] \\
+            [--admuser user] [--admpw pw] [--ldaph host] [--ldapdn dn] [--ldappw pw]
          Incremental backup for all or specific accounts only if the accounts 
           don't have a inc. backup from time. See "time FORMAT" below.
 
@@ -99,15 +113,13 @@ show_help ()
    zmbkpose -n [ -a mail1,mail2 mail3 ]
          List last mailbox backup copy for all or specific accounts.
 
-   zmbkpose -p n 
-		 Backups in parallel, with a maximum of "n" instances
-         Override PARALLEL_SUPPORT, and MAX_PARALLEL_PROCESS from config.
-
-   zmbkpose -r [ -a mail1,mail2 mail3 ] [-s]
+   zmbkpose -r [ -a mail1,mail2 mail3 ] [-s] [--rf file] \\
+            [--admuser user] [--admpw pw] [--ldaph host] [--ldapdn dn] [--ldappw pw]
          Restore last backup cycle(last full + later incrementals) for all or 
           specific accounts.
 
-   zmbkpose -R time [ -a mail1,mail2 mail3 ] [-s]
+   zmbkpose -R time [ -a mail1,mail2 mail3 ] [-s] \\
+            [--admuser user] [--admpw pw] [--ldaph host] [--ldapdn dn] [--ldappw pw]
          Restore for all or specific accounts up to the point in cycle (full and later incs.)
           reached by ( now - time ). time can be:
            * interval specified by "time FORMAT" (see below). The restore will be
@@ -155,9 +167,17 @@ function ldap_search()
 	local ldap_req_atts="$2"
 	local ldap_base_dn="${3}"
 
-	$LDAPSEARCH_cmd -x -H $LDAPMASTERSERVER \
-		-D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b "$ldap_base_dn" \
+	$LDAPSEARCH_cmd -x -H "$LDAPMASTERSERVER" \
+		-D "$LDAPZIMBRADN" -w "$LDAPZIMBRAPASS" -b "$ldap_base_dn" \
 		-LLL "$ldap_filter" $ldap_req_atts 
+}
+
+#
+## Test $LDAPMASTERSERVER", using  $LDAPZIMBRADN and $LDAPZIMBRAPASS 
+function ldap_test_server()
+{
+	debug "Testing ldapserver $LDAPMASTERSERVER, using user $LDAPZIMBRADN"
+	ldap_search "($LDAPZIMBRADN)" uid "$LDAPZIMBRADN"
 }
 
 #
@@ -188,8 +208,8 @@ function ldap_get_groups()
 #
 ## Add ldap entry
 function ldap_add(){
-	$LDAPADD_cmd -x -H $LDAPMASTERSERVER \
-		-D $LDAPZIMBRADN -w $LDAPZIMBRAPASS >&2
+	$LDAPADD_cmd -x -H "$LDAPMASTERSERVER" \
+		-D "$LDAPZIMBRADN" -w "$LDAPZIMBRAPASS" >&2
 }
 
 #
@@ -251,6 +271,22 @@ function ldif_analysis_get_entry()
 {
 	local dn="$1"
 	$SED_cmd -r -n -e "/dn: $dn/,/^$/p"
+}
+
+#
+## Try to automatically correct to attribute values for 
+##  zimbraMailHost and zimbraMailTransport ;based on user settings for
+##  admin
+function ldif_auto_change_MailHostConf()
+{
+	local admin_dn ldap_info
+	admin_dn=$(ldap_search "(uid=admin)" dn ""| $SED_cmd -r -n -e '1s/^dn: (.*)/\1/p')
+	[ -z "$admin_dn" ] && $SED_cmd -n p && return 0
+	ldap_info=$(ldap_search "(uid=admin)" "zimbraMailHost zimbraMailTransport" "$admin_dn")
+	at_zimbraMailHost=$(echo "$ldap_info"|$SED_cmd -r -n -e 's/^zimbraMailHost: (.*)/\1/p')
+	at_zimbraMailTransport=$(echo "$ldap_info"|$SED_cmd -r -n -e 's/^zimbraMailTransport: (.*)/\1/p')
+	[ -z "$at_zimbraMailHost" -o -z "$at_zimbraMailTransport" ] && $SED_cmd -n p && return 0
+	$SED_cmd -r -e "s/^(zimbraMailHost: ).*/\1$at_zimbraMailHost/ ; s/^(zimbraMailTransport: ).*/\1$at_zimbraMailTransport/"
 }
 
 ################################################################################
@@ -658,24 +694,33 @@ function get_accounts_in_order_of_need_backup(){
 function backup_account(){
 	local account="$1"
 	local mode="$2"
-	local query="$3"
+	local backup_file="$3"
+	local query="$4"
 	local init_tt=$(time_cur_tt)
 	local user_bk_dir=${WORKDIR}/$account
-	[ ! -d "$user_bk_dir" ] && mkdir -p "$user_bk_dir"
-	local backup_file; backup_file=$(backup_create_file \
-		$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
-	mkdir -p ${backup_file}.files #Temporary files
+
+	#Backup to WORKDIR
+	if [ -z "$backup_file" ];then 
+		[ ! -d "$user_bk_dir" ] && mkdir -p "$user_bk_dir"
+		backup_file=$(backup_create_file \
+			$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
+	fi
 
 	#Remove all if error, or return
 	trap "[ $? -ne 0 ] && rm -f $backup_file; rm -rf $backup_file.files;trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
+	mkdir -p ${backup_file}.files #Temporary files
 
 	debug "$account - START $mode backup ..."
 
 	#Ldap backup
 	local ldap_bkf=${backup_file}.files/$LDAP_FILE_IN_TAR
 	debug "$account - Doing ldap backup ..."
-	[ -z "$SIMULATE" ] && { zimbra_ldap_backup "$account" $ldap_bkf || return 1 ;}
-	debug "$account - ldap backup complete"
+	if [ -z "$SIMULATE" ] ;then
+		zimbra_ldap_backup "$account" $ldap_bkf 
+		debug "$account - ldap backup complete"
+	fi
+
+	[ -n "$SIMULATE" ] && debug "$account - Doing mailbox backup ..." && return 0
 
 	#Mailbox backup is dependent on the type of account
 	local mbox_bkf=${backup_file}.files/$MAILBOX_FILE_IN_TAR
@@ -712,13 +757,14 @@ backup_account_incremental()
 {
 	local account="$1"
 	local mode="$2"
+	local backup_to_file="$3"
 	
 	local last_from=$(get_account_date_time_mark_last_backup "$account")
 
 	if [ -z "$last_from" ]; then
 		if [ "$DO_FULL_IF_NO_PREV_INC" = yes ];then
 			debug "$account - No previous inc. backup. Doing FULL..."
-			backup_account $account $backup_dir $FULL_MARK
+			backup_account "$account" "$FULL_MARK" "$backup_to_file"
 			return 0
 		else
 			debug "$account - No previous backup. Incremental cancelled. Use -t for force full."
@@ -728,7 +774,7 @@ backup_account_incremental()
 		passed_secs=$(( $(time_cur_tt) - $(time_cnv_date_time_mark_to_tt $last_from) ))
 		query="query=after:-$(( passed_secs / 60 ))mi" 
 		debug "$account - Last backup from "$(human_date_time --date="now - ${passed_secs}secs")" ..."
-		backup_account $account $backup_dir $mode "$query" 
+		backup_account "$account" "$mode" "$backup_to_file" "$query"
 		return 0
 	fi
 }
@@ -739,20 +785,32 @@ restore_account()
 {
 	local account="$1"
 	local date_time_mark_until="$2"
-	#restore files
-	local restore_files
-	restore_files=$(get_last_backup_cycle_prior_to $account $date_time_mark_until)
-	[ -z "$restore_files" ] && \
-		debug "$account - No backup files available for restoration" && return 0
-	local last_backup;last_backup=$(last_word "$restore_files")
-	debug "$account - Using ldap data from backup $last_backup"
+	local restore_files="$3"
+	local last_backup
+	#Restore files
+	if [ -n "$restore_files" ];then
+		last_backup="${restore_files}"
+	else
+		restore_files=$(get_last_backup_cycle_prior_to $account $date_time_mark_until)
+		[ -z "$restore_files" ] && \
+			debug "$account - No backup files available for restoration" && return 0
+		last_backup=$(last_word "$restore_files")
+		debug "$account - Using ldap data from backup $last_backup"
+	fi
 
 	#Ldap data from last backup
-	local ldap_data;ldap_data=$($TAR_cmd -O -xf $last_backup $LDAP_FILE_IN_TAR)
+	local ldap_data;ldap_data=$($TAR_cmd -O -xf "$last_backup" $LDAP_FILE_IN_TAR)
+
+	#If you are restoring in another server, we will need to change
+	# some ldap atributtes if you want the account works
+	if [ -n "$TRY_DETECT_MailHostConf_on_restore" ];then
+		ldap_data=$(echo "$ldap_data"| ldif_auto_change_MailHostConf)
+	fi
 
 	#LDAP restore. Only add operation. 
 	#I think deletion is not secure implement. Modifications based on the 
 	# differences will be quite a challenge. I need you!
+	debug "$account - Ldap restore started"
 	for dn in $(echo "$ldap_data" |ldif_analysis_get_att dn y);do
 		if ! ldap_dn_exists "$dn" ;then 
 			debug "$account - Adding ldap entry: $dn"
@@ -768,24 +826,34 @@ restore_account()
 
 	#Mailbox restore
 	local mailhost
-	mailhost=$(ldap_get_mailbox_atts "$account" "zimbraMailHost"|ldif_analysis_get_att zimbraMailHost)
-	[ -z "$mailhost" ] && error "$account - Can not get zimbraMailHost ldap att." && return 1
+	mailhost=$(echo "$ldap_data"| ldif_analysis_get_att zimbraMailHost)
+	[ -z "$mailhost" ] && error "$account - Can not get zimbraMailHost ldap att. from ldap backup" && return 1
 	debug "$account - Mailbox restore started"
-	local human_date_time
-	while read date_time_mark full_inc tar_bkfile;do 
-		[ -z "$date_time_mark" ] && continue
-		human_date_time=$(time_cnv_date_time_mark_to_human $date_time_mark)
-		debug "$account - Restauring from $human_date_time $full_inc"
-		if [ -z "$SIMULATE" ] && \
-		  $TAR_cmd -tf $tar_bkfile $MAILBOX_FILE_IN_TAR >/dev/null 2>&1;then
-			$TAR_cmd -O -xf $tar_bkfile $MAILBOX_FILE_IN_TAR| \
+
+	while read tar_bkfile ;do [ -z "$tar_bkfile" ] && continue
+		#Debugg info
+		if [ "${tar_bkfile#$WORKDIR}" != "$tar_bkfile" ];then #file in WORKDIR
+			echo "$tar_bkfile"| get_from_backup_file_name DATE_TIME_MARK FULL_INC |
+				{ read date_time_mark full_inc ;
+				 local human_date_time=$(time_cnv_date_time_mark_to_human $date_time_mark);
+				 debug "$account - Restauring from $human_date_time $full_inc" ;}
+		else
+			debug "$account - Restauring from \"$tar_bkfile\""
+		fi
+		#Restore
+		if ! $TAR_cmd -tf "$tar_bkfile" $MAILBOX_FILE_IN_TAR >/dev/null 2>&1;then
+			error "file $MAILBOX_FILE_IN_TAR does not exists in tar file \"$tar_bkfile\""
+			return 1
+		fi
+		if [ -z "$SIMULATE" ] ;then
+			$TAR_cmd -O -xf "$tar_bkfile" $MAILBOX_FILE_IN_TAR| \
 				zimbra_mailbox_restore "$account" "$mailhost" 
 		fi
 	done<<-BACKUPS
-		$( echo "$restore_files"| 
-			get_from_backup_file_name DATE_TIME_MARK FULL_INC FULL_PATH )
+		$restore_files
 		BACKUPS
-	debug "$account - Mailbox restore end"
+
+	debug "$account - Restore end"
 }
 
 #
@@ -916,31 +984,6 @@ trap "kill -s SIGTERM -- 0" SIGINT SIGTERM
 [ -z "$UNIQ_cmd" ] && UNIQ_cmd=$(which uniq) || exit 1
 [ -z "$READLINK_cmd" ] && READLINK_cmd=$(which readlink) || exit 1
 
-[ -z "$WORKDIR" ] && \
-	error "CONFIG: You need to define WORKDIR" && exit 1
-[ ! -d "$WORKDIR" ] && \
-	error "The directory $WORKDIR doesn't exist" && exit 1
-
-[ -z "$ADMINUSER" ] && \
-	error "CONFIG: You need to define the variable ADMINUSER" && \
-	exit 1
-
-[ -z "$ADMINPASS" ] && \
-	echo "CONFIG: You need to define the variable ADMINPASS" && \
-	exit 1
-
-[ -z "$LDAPMASTERSERVER" ] && \
-	echo "CONFIG:You need to define the variable LDAPMASTERSERVER" && \
-	exit 1
-
-[ -z "$LDAPZIMBRADN" ] && \
-	echo "You need to define the variable LDAPZIMBRADN" && \
-	exit 1
-
-[ -z "$LDAPZIMBRAPASS" ] && \
-	echo "You need to define the variable LDAPZIMBRAPASS" && \
-	exit 1
-
 # Criticize the parameters passed on the command line
 while [ -n "$1" ];do
 	case "$1" in
@@ -949,10 +992,34 @@ while [ -n "$1" ];do
 			accounts=${2//,/ } #Multiple accounts comma separated
 			shift 2
 		;;
+		(--admuser) #Mailbox admin user
+			[ -z "$2" ] && show_help && exit 
+			ADMINUSER="$2" 
+			shift 2
+		;;
+		(--admpw) #Mailbox admin user password
+			[ -z "$2" ] && show_help && exit 
+			ADMINPASS="$2" 
+			shift 2
+		;;
+		(--bf) #Backup to a specific file(don't use WORKDIR)
+			[ -z "$2" ] && show_help && exit 
+			backup_to_file="$2"
+			if [ -f "$backup_to_file" ] ;then
+				error "File: \"$backup_to_file\", already exists."
+				exit 1
+			fi
+			shift 2
+		;;
+
 		(-c) #For backups, operates only with a certain number of accounts. 
 			[ -z "$2" ] && show_help && exit 
 			account_limit=$2
 			shift 2
+		;;
+		(--chldaph) #In the restore, try changing some attributes of LDAP for account work.
+			TRY_DETECT_MailHostConf_on_restore=y 
+			shift 1
 		;;
 		(-C) #Similar to "-c", backups up to reach the time "time"
 			[ -z "$2" ] && show_help && exit 
@@ -1026,6 +1093,22 @@ while [ -n "$1" ];do
 			esac
 			shift 1
 		;;
+		(--ldaph) #Ldap master server
+			[ -z "$2" ] && show_help && exit 
+			LDAPMASTERSERVER="ldap://$2" 
+			TRY_DETECT_MailHostConf_on_restore=y 
+			shift 2
+		;;
+		(--ldapdn) #Ldap zimbra admin user
+			[ -z "$2" ] && show_help && exit 
+			LDAPZIMBRADN="$2" 
+			shift 2
+		;;
+		(--ldappw) #Ldap zimbra admin password
+			[ -z "$2" ] && show_help && exit 
+			LDAPZIMBRAPASS="$2" 
+			shift 2
+		;;
 		(-p) #Backups in parallel, with a maximum of "n" instances
 			[ -z "$2" ] && show_help && exit 
 			PARALLEL_SUPPORT=1
@@ -1040,12 +1123,32 @@ while [ -n "$1" ];do
 			action=RESTORE
 			shift 1
 		;;
+		(--rf) #Restore from a specific tar backup file
+			[ -z "$2" ] && show_help && exit 
+			restore_from_file="$2"
+			if [ ! -f "$restore_from_file" ] ;then
+				error "File: \"$restore_from_file\" does not exists."
+				exit 1
+			fi
+			if [ -n "$rest_date_time_mark_until" ];then
+				error "You cannot combine --rf and -R argument. You must use -r with --rf"
+				show_help
+				exit 1
+			fi
+			shift 2
+		;;
+
 		(-R) #Restore accounts up to the nearest backup before the ( now - 
                    #   lapse_specified_time )
 		   # Time can be expresed in format $DATE_TIME_MARK_FORMAT or : 
 		   # n[mhdwM], where n is a number, "m" for minutes, "h" for hours, "d" 
 		   # for days, "w" for weeks, and "M" for months.
 			[ -z "$2" ] && show_help && exit 
+			if [ -n "$restore_from_file" ];then
+				error "You cannot combine --rf and -R argument. You must use -r with --rf"
+				show_help
+				exit 1
+			fi
 			if [ "$2" = - ] ;then
 				rest_date_time_mark_until=$2 #Rest. all backups starting with the oldest
 			elif restore_until_secs=$( cnv_time_expr_to_secs $2 );then
@@ -1078,6 +1181,38 @@ while [ -n "$1" ];do
 	esac
 done
 
+#Needed values depending on the action 
+case $action in
+	#Backup and restore
+    (FULL_BACKUP|INC_BACKUP|COND_BACKUP|RESTORE) 
+		if [ -z "$backup_to_file" ];then
+			[ -z "$WORKDIR" ] && \
+				error "CONFIG: You need to define WORKDIR. Or use --bf arg." && exit 1
+		fi
+		[ -z "$ADMINUSER" ] && \
+			error "CONFIG: You need to define the variable ADMINUSER. Or use --admuser arg." && \
+			exit 1
+		[ -z "$ADMINPASS" ] && \
+			error "CONFIG: You need to define the variable ADMINPASS. Or use --admpw arg." && \
+			exit 1
+		[ -z "$LDAPMASTERSERVER" ] && \
+			error "CONFIG:You need to define the variable LDAPMASTERSERVER. Or use --ldaph arg." && \
+			exit 1
+		[ -z "$LDAPZIMBRADN" ] && \
+			error "You need to define the variable LDAPZIMBRADN. Or use --ldapdn arg." && \
+			exit 1
+		[ -z "$LDAPZIMBRAPASS" ] && \
+			error "You need to define the variable LDAPZIMBRAPASS. Or use --ldappw arg." && \
+			exit 1
+    ;;
+
+	#Get info, and delete backups
+	(GET_BACKUPS_INFO|GET_FIRST_BACKUP_INFO|GET_LAST_BACKUP_INFO|DELETE_OLD_BACKUPS) 
+		[ -z "$WORKDIR" ] && \
+			error "CONFIG: You need to define WORKDIR." && exit 1
+    ;;
+esac
+
 
 #Do Action
 case $action in
@@ -1086,8 +1221,11 @@ case $action in
 		[ -z "$accounts" ] && \
 			debug "Geting accounts in order of need backup." && \
 			accounts=$(get_accounts_in_order_of_need_backup)
-		debug "Analizing $(echo $accounts |wc -w) accounts"
 
+		#Is ldap server functional?
+		ldap_test_server	
+
+		debug "Analizing $(echo $accounts |wc -w) accounts"
 		#For each account
 		init_tt=$(time_cur_tt) ; bk_count=0
 		for account in $accounts;do 
@@ -1117,9 +1255,9 @@ case $action in
 			#Secuencial, or parallel backup?
 			if [ "$PARALLEL_SUPPORT" = 1 ];then #Parallel 
 				until [ "$(jobs -r|wc -l)" -lt $MAX_PARALLEL_PROCESS ]; do sleep 5 ; done
-				$do_FUNCTION $account $mode &
+				$do_FUNCTION $account "$mode" "$backup_to_file" &
 			else #Secuencial
-				$do_FUNCTION $account $mode
+				$do_FUNCTION $account "$mode" "$backup_to_file"
 			fi
 
 			let bk_count++ || true ; 
@@ -1162,11 +1300,14 @@ case $action in
 		#If not accounts passed, we use all accounts
 		[ -z "$accounts" ] && accounts=$(ldap_get_groups ; ldap_get_accts)
 	
-		[ -z "$rest_date_time_mark_until" ] && \
+		[ -z "$rest_date_time_mark_until" -a -z "$restore_from_file" ] && \
 			rest_date_time_mark_until=$(time_cur_date_time_mark) 
+ 
+		#Is ldap server functional?
+		ldap_test_server	
 
 		for account in $accounts;do
-			restore_account $account $rest_date_time_mark_until
+			restore_account $account "$rest_date_time_mark_until" "$restore_from_file"
 		done
     ;;
 
