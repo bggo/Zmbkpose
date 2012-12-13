@@ -1155,10 +1155,7 @@ case $action in
 		#If not accounts passed, we use all accounts
 		[ -z "$accounts" ] && accounts=$(get_accounts_in_backups)
 
-		#For each account
-		#for account in $accounts;do
-			get_account_backups_info $position $accounts
-		#done
+		get_account_backups_info $position $accounts
     ;;
 
 	(RESTORE) #Restore accounts from backups
