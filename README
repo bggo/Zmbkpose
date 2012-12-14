@@ -252,7 +252,7 @@ HOME=/
 LOG_FILE=$(/bin/date '+%Y.%m.%d_%H.%M.%S').log
 
 ##FULL Backups
-0 0 * * * backupmail /usr/local/bin/zmbkpose.wrapper -F 20d -C 6h -c 50 -e 5s
+0 0 * * * backupmail /usr/local/bin/zmbkpose.wrapper -F 20d -C 6h -c 400 -e 5s
 ##INC Backups
 0 6  * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
 0 9  * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s

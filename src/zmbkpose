@@ -503,6 +503,7 @@ function get_backups_account(){
 function get_backup_cycles_older_than(){
 	local account="$1"
 	local date_time_mark_until="$2"
+	local cycles_to_ignore=''
 	[ -z "$date_time_mark_until" ] && return 1
 
 	while read date_time_mark full_inc bkfile ;do 
@@ -863,9 +864,10 @@ delete_old_backups_of_account()
 	local account="$1"
 	local date_time_mark_until="$2"
 	
-	debug "$account - START deleting old backups"
+	debug "$account - START deleting old backups cycles prior to" \
+		"$(time_cnv_date_time_mark_to_human $date_time_mark_until)"
 
-	if [ -z "$(get_backups_account "$account" $position)" ];then
+	if [ -z "$(get_backups_account "$account" FIRST)" ];then
 		debug "$account - Account does not have backups."
 		return 0
 	fi
