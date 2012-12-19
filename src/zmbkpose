@@ -1188,8 +1188,11 @@ done
 case $action in
 	#Backup and restore
     (FULL_BACKUP|INC_BACKUP|COND_BACKUP|RESTORE) 
-		if [ -z "$backup_to_file" ];then
-			[ -z "$WORKDIR" ] && \
+		if [ $action = RESTORE ];then
+			[ -z "$restore_from_file" -a -z "$WORKDIR" ] && \
+				error "CONFIG: You need to define WORKDIR. Or use --rf arg." && exit 1
+		else #Backup
+			[ -z "$backup_to_file" -a -z "$WORKDIR" ] && \
 				error "CONFIG: You need to define WORKDIR. Or use --bf arg." && exit 1
 		fi
 		[ -z "$ADMINUSER" ] && \
