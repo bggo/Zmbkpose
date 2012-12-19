@@ -746,7 +746,8 @@ function backup_account(){
 		$TAR_cmd -r -C $(dirname $ldap_bkf) -f $backup_file $(basename "$mbox_bkf")
 
 	#Link to last backup
-	if [ -f $backup_file ];then
+	if [ -f $backup_file ] &&
+		[ "${backup_file#$WORKDIR}" != "$backup_file" ];then #file in WORKDIR
 		$LN_cmd -fs ${backup_file##*/} ${backup_file%/*}/LAST
 		debug "$account - END in $(( $(time_cur_tt) - $init_tt ))secs," \
 			"using $($DU_cmd -h $backup_file|$AWK_cmd '{print $1}')"
