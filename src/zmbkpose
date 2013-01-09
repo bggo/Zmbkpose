@@ -1286,6 +1286,7 @@ case $action in
 				debug "Waiting $time_btw_bks secs..." && sleep $time_btw_bks
 		done
 		wait #Waiting for background processes
+		debug "Backup FINISHED $bk_count backups performed"
     ;;
 
 	(GET_BACKUPS_INFO|GET_FIRST_BACKUP_INFO|GET_LAST_BACKUP_INFO) #Get info from backups 
