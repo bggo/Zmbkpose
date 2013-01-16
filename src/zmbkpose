@@ -1219,6 +1219,8 @@ case $action in
     ;;
 esac
 
+#Check if destination dir exists
+[ -z "$backup_to_file" -a ! -d "$WORKDIR" ] && error "$WORKDIR doesn't exists!" && exit 1
 
 #Do Action
 case $action in
