@@ -80,6 +80,18 @@ Upgraded
 	-Bug corrections:  
 	Wrong variables names references after translate to english
 
+Upgraded
+31/01/2012 - Version 2.1 Beta
+			By William Felipe Welter
+				<william.welter@4linux.com.br>
+				<wfelipew@gmail.com>
+	-Added functions:
+	restore_on_box() - Restore backup on other specified account. 
+	notify_email() - Send a report to email address specified on the option EMAIL_NOTIFY in "zmbkpose.conf"
+	
+	-Bug corrections
+	Individual account full backup in paralel mode
+
 			 
 #######################################################################
 

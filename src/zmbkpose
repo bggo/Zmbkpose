@@ -69,6 +69,9 @@ echo "Usage:
      zmbkpose --restoreAllAccounts 
 			Restore all accounts 
 
+     zmbkpose --restoreOnAccount <orig_account> <dst_account>
+                        Restore backup on another specified account
+
      zmbkpose --backupDistributionList
 			Make full backup of Distribution  Lists
 
@@ -113,6 +116,9 @@ echo "Usos:
 			Restaura apenas o perfil do usuário, incluindo senha utilizada.
 			DICA: Pode ser necessário atualizar o cache do servidor para imediata aplicação dos atributos restaurados.
 			      zmprov fc account nome_da_conta
+     zmbkpose --restoreOnAccount <orig_account> <dst_account>
+                        Restore backup on another specified account
+
      zmbkpose -d n
 			Onde \"n\" é um número.
 			Exclui todos os backups anteriores a quantidade de dias especificada na linha de comandos.
@@ -126,6 +132,18 @@ echo "Usos:
 "
 # TODO: Deixar uma opção de "Disaster Recovery" oculta + confirmações
 exit 0
+}
+
+
+# Function to notify completes backup trough e-mail
+notify_email()
+{
+	
+	TIPO=$1;
+	session=$2;
+	du -h $WORKDIR/$session/* > /tmp/list-$session ;
+	total=$(du -h $WORKDIR/$session | awk {'print $1'});
+	(echo "Subject: Backup $TIPO completed on $(date)";echo "Backup $TIPO completed on $(date)";echo -e "\r\nTotal: $total ";echo "Summary of files:"; cat /tmp/list-$session) | /opt/zimbra/postfix/sbin/sendmail $EMAIL_NOTIFY
 }
 
 #This functions realize backup of distribution list
@@ -201,6 +219,7 @@ backup_all_accounts_parallel()
 
 	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
 	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
+	notify_email "FULL" $SESSION 
 
 	echo "$(date) - Backup completed for $COUNT account(s)" >> $LOGFILE
 	exit 0
@@ -230,6 +249,8 @@ backup_all_accounts ()
 
 	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
 	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
+	notify_email "FULL" $SESSION 
+
 	exit 0
 }
 
@@ -303,6 +324,7 @@ backup_accounts_parallel ()
         fi
         
         echo "SESSION: $SESSION concluída em $(date)" >> $WORKDIR/sessions.txt
+	notify_email "FULL" $SESSION 
         SESSION="$SUBSESSION"
         TEMPDIR="$SUBTEMP"
 }
@@ -368,14 +390,24 @@ incremental_all_accounts ()
 	fi
 
 	echo "SESSION: $SESSION concluída em $(date)" >> $WORKDIR/sessions.txt
+	notify_email "INCREMENTAL" $SESSION 
 	exit 0
 }
 
 
 backup_accounts ()
 {
+	
+	
+	if [ -z $SESSION ]; then
+		SESSION="full-"$(date  +%Y%m%d%H%M%S)
+	fi
+
+
         SUBSESSION="$SESSION"
         SUBTEMP=$TEMPDIR
+	
+	
 
         if [ -z $2 ]; then
                 SESSION=$SUBSESSION
@@ -417,6 +449,7 @@ backup_accounts ()
         fi
         
 	echo "SESSION: $SESSION concluída em $(date)" >> $WORKDIR/sessions.txt
+	notify_email "FULL" $SESSION 
 	SESSION="$SUBSESSION"
 	TEMPDIR="$SUBTEMP"
 }
@@ -468,6 +501,7 @@ incremental_accounts ()
 
 	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
 	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
+	notify_email "INCREMENTAL" $SESSION 
 	exit 0
 }
 
@@ -533,6 +567,43 @@ restore_accounts ()
 	done
 	exit 0
 }
+
+
+restore_on_box()
+{
+		BKPSACCOUNT=$(mktemp)
+	        MAIL=$1
+		DEST=$2
+	        if [ -z $MAIL ]; then
+	                break
+	        fi
+
+	        if [ -n $DEST ]; then
+
+			grep $MAIL $WORKDIR/sessions.txt | grep -e ^inc- -e ^full- > $BKPSACCOUNT
+			if ! [ -s $BKPSACCOUNT ]; then
+	               		echo "$MAIL: No backup found. Impossible to restore."
+	                	exit 1
+	                else
+	                	echo "Sessions found $(cat $BKPSACCOUNT | awk -F: '{print $1}')"
+				
+				for SESSIONACCOUNT in $(cat $BKPSACCOUNT | awk -F: '{print $1}'); do
+					echo "Restoring from $SESSIONACCOUNT on $DEST"
+					MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')                                  	                                        	
+					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/?fmt=tgz
+					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Junk?fmt=tgz
+					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Trash?fmt=tgz
+					echo "$MAIL restored from  $SESSIONACCOUNT on $DEST"
+                                done
+                                	unset MAIL
+                        	fi
+                	fi
+        	
+	
+}
+
+
+
 
 
 
@@ -767,20 +838,22 @@ fi
 
 case "$1" in
 "-f" )
-	if [ $PARALLEL_SUPPORT -eq 1  ];then
+	if [ -z "$2" ]; then
+		if [ $PARALLEL_SUPPORT -eq 1  ];then
 			echo "Running the parallel backup"
 			backup_all_accounts_parallel
 		else
-			if [ -z "$2" ]; then
-				backup_all_accounts
-			else
-				if [ -z "$3" ]; then
-					backup_accounts $2
-				fi
-				echo "Incorrect $@ params. Read --help."
-       		 		show_help
+			backup_all_accounts
+		fi
+	else
+		if [ -z "$3" ]; then
+			backup_accounts $2
+		else
+			echo "Incorrect $@ params. Read --help."
+			show_help
 		fi
 	fi
+
 ;;
 "-i" )
 	if [ -z "$2" ]; then
@@ -846,6 +919,11 @@ case "$1" in
 ;;
 "--restoreDistributionList" )
 	restore_distribution_list
+;;
+"--restoreOnAccount" )
+	if ! [   -z $2 -o -z $3    ]; then
+        	restore_on_box $2 $3
+	fi
 ;;
 "-d" )
 	if [ -z "$2" ]; then
