@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ############################# Zmbkpose ################################
 
 The zmbkpose tool is a shell script that does hot backup and hot restore of ZCS
- Opensource accounts, GPL(OPENSOURCE). It can run from any host in the net, 
+Opensource accounts, GPL(OPENSOURCE). It can run from any host in the net, 
 which means that it can be set on a backup server already existent.
 
 It was concepted after Zimbra released ZCS 5.0.12, where a new import/export 
 feature was exposed to user can be able to do his archiving. From that point 
 it was clear for me that I just need to write a code to automatically get all
- user data from server, remotely via HTTP SOAP. Plus LDAP data. So, it is 
+user data from server, remotely via HTTP SOAP. Plus LDAP data. So, it is 
 possible to run full backups and restore even deleted accounts.
 
 Till now, zmbkpose provides
@@ -81,6 +81,7 @@ Upgraded
 	Wrong variables names references after translate to english
 
 Upgraded
+<<<<<<< HEAD
 31/01/2012 - Version 2.1 Beta
 			By William Felipe Welter
 				<william.welter@4linux.com.br>
@@ -91,6 +92,16 @@ Upgraded
 	
 	-Bug corrections
 	Individual account full backup in paralel mode
+=======
+25/07/2012 - Version 2.0 Beta 2
+			By Diego Alencar Alves de Lima
+				<diego.lima@4linux.com.br>
+				<diego@diegolima.org>
+	- New installer script
+
+	- Modified:
+	zmbkpose.conf now uses paralel backup capability by default
+>>>>>>> 8dae5174f7f7414b54f1511be456cf74d630f31b
 
 			 
 #######################################################################

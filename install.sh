@@ -1,69 +1,196 @@
 #!/bin/bash
+# install.sh
+# This script installs zmbkpose on a ZCS server. It also makes sure
+# the script's dependencies are present.
+#
+# LIMITATIONS: This script assumes you're doing a local install and requires the 
+# user zimbra to exist on your server. While not strictly necessary this is 
+# enforced due to the way the current zmbkpose script works.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Simple install script
+# Zmbkpose Defaults - Where the script will be placed and look for its settings
+OSE_SRC="/usr/local/bin"
+OSE_CONF="/etc/zmbkpose"
 
-CONF=/etc/zmbkpose/
-SRC=/usr/local/bin/
+# Zimbra Defaults - Change these if you compiled zimbra yourself with different 
+# settings
+ZIMBRA_USER="zimbra"
+ZIMBRA_DIR="/opt/zimbra"
+ZIMBRA_BKPDIR=""		# Leave empty to autodetect
+ZIMBRA_HOSTNAME=""		# Leave empty to autodetect
+ZIMBRA_ADDRESS=""		# Leave empty to autodetect
+ZIMBRA_LDAPPASS=""		# Leave empty to autodetect
 
 
-check_root() {
-if [ $(id -u) -ne 0 ];then
-	echo "To install zmbkpose you need to have root privileges"
-	exit 2
+# Exit codes
+ERR_OK="0"			# No error (normal exit)
+ERR_NOBKPDIR="1"		# No backup directory could be found
+ERR_NOROOT="2"			# Script was run without root privileges
+ERR_DEPNOTFOUND="3"		# Missing dependency
+
+# Try to guess missing settings as best as we can
+test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - zimbra -c zmhostname`
+test -z $ZIMBRA_ADDRESS  && ZIMBRA_ADDRESS=`grep $ZIMBRA_HOSTNAME /etc/hosts|awk '{print $1}'`
+test -z $ZIMBRA_LDAPPASS && ZIMBRA_LDAPPASS=`su - zimbra -c "zmlocalconfig -s zimbra_ldap_password"|awk '{print $3}'`
+if [ -z $ZIMBRA_BKPDIR ]; then
+	test -d $ZIMBRA_DIR/backup && ZIMBRA_BKPDIR=$ZIMBRA_DIR/backup
+	test -d /backup && ZIMBRA_BKPDIR=/backup
+	test -d /opt/backup && ZIMBRA_BKPDIR=/opt/backup
 fi
-}
 
+if [ -z $ZIMBRA_BKPDIR ]; then
+	echo "No backup directory could be found! Please edit this script and declare it manually."
+	exit $ERR_NOBKPDIR
+fi
 
-check_exist() {
+clear
+echo "This will install zmbkpose, a script aimed at creating backups for ZCS Community Edition."
+read -p "What is the password for Zimbra's \"admin\" user? " ZIMBRA_ADMPASS
+echo ""
+echo "Here is a Summary of your settings:"
+echo ""
+echo "Zimbra User: $ZIMBRA_USER"
+echo "Zimbra Hostname: $ZIMBRA_HOSTNAME"
+echo "Zimbra IP Address: $ZIMBRA_ADDRESS"
+echo "Zimbra LDAP Password: $ZIMBRA_LDAPPASS"
+echo "Zimbra Admin Password: $ZIMBRA_ADMPASS"
+echo "Zimbra Install Directory: $ZIMBRA_DIR"
+echo "Zimbra Backup Directory: $ZIMBRA_BKPDIR"
+echo "Zmbkpose Install Directory: $OSE_SRC"
+echo "Zmbkpose Settings Directory: $OSE_CONF"
+echo ""
+echo "Press ENTER to continue or CTRL+C to cancel."
+read tmp
 
-if [ -d $DIR ];then
-	echo "$DIR - Ok"
+# Check if we have root before doing anything
+if [ $(id -u) -ne 0 ]; then
+	echo "You need root privileges to install zmbkpose"
+	exit $ERR_NOROOT
+fi
+
+# Check for missing installer files
+# TODO: MD5 check of the files
+printf "Checking installer integrity...	"
+STATUS=0
+MYDIR=`dirname $0`
+test -f $MYDIR/src/zmbkpose      || STATUS=$ERR_MISSINGFILES
+test -f $MYDIR/etc/zmbkpose.conf || STATUS=$ERR_MISSINGFILES
+if ! [ $STATUS = 0 ]; then
+	printf '[ERROR]\n'
+	echo "Some files are missing. Please re-download the Zmbkpose installer."
+	exit $STATUS
 else
-	echo "$DIR not found, creating"
-	mkdir -p $DIR
+	printf '[OK]\n'
 fi
 
-}
+# Check for missing dependencies
+STATUS=0
+echo "Checking system for dependencies..."
 
+## Zimbra Mailbox
+printf "	ZCS Mailbox Control...	"
+su - $ZIMBRA_USER -c "which zmmailboxdctl" > /dev/null 2>&1
+if [ $? = 0 ]; then
+        printf "[OK]\n"
+else
+        printf "[NOT FOUND]\n"
+        STATUS=$ERR_DEPNOTFOUND
+fi
 
-copy_files() {
+## LDAP utils
+printf "	ldapsearch...	"
+su - $ZIMBRA_USER -c "which ldapsearch" > /dev/null 2>&1
+if [ $? = 0 ]; then
+	printf "[OK]\n"
+else
+	printf "[NOT FOUND]\n"
+	STATUS=$ERR_DEPNOTFOUND
+fi
 
-echo "cp $DIR/* $DEST"
-cp $DIR/* $DEST
+## Curl
+printf "	curl...		"
+su - $ZIMBRA_USER -c "which curl" > /dev/null 2>&1
+if [ $? = 0 ]; then
+        printf "[OK]\n"
+else
+        printf "[NOT FOUND]\n"
+        STATUS=$ERR_DEPNOTFOUND
+fi
 
-}
+## mktemp
+printf "	mktemp...	"
+su - $ZIMBRA_USER -c "which mktemp" > /dev/null 2>&1
+if [ $? = 0 ]; then
+        printf "[OK]\n"
+else
+        printf "[NOT FOUND]\n"
+        STATUS=$ERR_DEPNOTFOUND
+fi
 
-exec_perm() {
+## date
+printf "	date...		"
+su - $ZIMBRA_USER -c "which date" > /dev/null 2>&1
+if [ $? = 0 ]; then
+        printf "[OK]\n"
+else
+        printf "[NOT FOUND]\n"
+        STATUS=$ERR_DEPNOTFOUND
+fi
 
-echo "chmod +x $FILE"
-chmod +x $FILE
+## egrep
+printf "	egrep...	"
+su - $ZIMBRA_USER -c "which egrep" > /dev/null 2>&1
+if [ $? = 0 ]; then
+        printf "[OK]\n"
+else
+        printf "[NOT FOUND]\n"
+        STATUS=$ERR_DEPNOTFOUND
+fi
 
-}
-### Main
+if ! [ $STATUS = 0 ]; then
+	echo ""
+	echo "You're missing some dependencies OR they are not on $ZIMBRA_USER's PATH."
+	echo "Please correct the problem and run the installer again."
+	exit $STATUS
+fi
+# Done checking deps
 
-check_root
+echo "Installing..."
 
-DIR=$SRC
-check_exist
+# Create directories if needed
+test -d $OSE_CONF || mkdir -p $OSE_CONF
+test -d $OSE_SRC  || mkdir -p $OSE_SRC
 
-DIR=$CONF
-check_exist 
+# Copy files
+install -o $ZIMBRA_USER -m 700 $MYDIR/src/zmbkpose $OSE_SRC
+install --backup=numbered -o $ZIMBRA_USER -m 600 $MYDIR/etc/zmbkpose.conf $OSE_CONF
 
-####### Coping sourcecode
+# Add custom settings
+sed -i "s|{ZIMBRA_BKPDIR}|${ZIMBRA_BKPDIR}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_ADDRESS}|${ZIMBRA_ADDRESS}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_ADMINPASS}|${ZIMBRA_ADMPASS}|g" $OSE_CONF/zmbkpose.conf
+sed -i "s|{ZIMBRA_LDAPPASS}|${ZIMBRA_LDAPPASS}|g" $OSE_CONF/zmbkpose.conf
 
-DIR=src
-DEST=$SRC
-copy_files
+# Fix backup dir permissions (owner MUST be $ZIMBRA_USER)
+chown $ZIMBRA_USER $ZIMBRA_BKPDIR
 
-DIR=etc
-DEST=$CONF
-copy_files
+# We're done!
+read -p "Install completed. Do you want to display the README file? (Y/n)" tmp
+case "$tmp" in
+	y|Y|Yes|"") less $MYDIR/README;;
+	*) echo "Done!";;
+esac
 
-######## Perm
-
-FILE=${SRC}zmbkpose
-exec_perm
-
-
-
-
+exit $ERR_OK
