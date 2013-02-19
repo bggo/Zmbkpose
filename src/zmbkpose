@@ -960,6 +960,11 @@ function last_word(){
 	echo "$@" |$SED_cmd 's/ /\n/g'|$SED_cmd '/^$/d'|$SED_cmd -n '$p'
 }
 
+#
+##Error if no command
+function no_command_error(){
+	echo "ERROR:You dont have \"$1\" command, or it is not in your PATH" >&2
+}
 
 ###### MAIN ############
 # Here the code loads the config file
@@ -968,24 +973,24 @@ source $OSE_CONF/zmbkpose.conf
 #Trap INT, TERM signals, for close child process (util with parallel backups)
 trap "kill -s SIGTERM -- 0" SIGINT SIGTERM
 
-[ -z "$AWK_cmd" ] && AWK_cmd=$(which awk) || exit 1
-[ -z "$CURL_cmd" ] && CURL_cmd=$(which curl) || exit 1
-[ -z "$DATE_cmd" ] && DATE_cmd=$(which date) || exit 1
-[ -z "$DU_cmd" ] && DU_cmd=$(which du) || exit 1
-[ -z "$EGREP_cmd" ] && EGREP_cmd=$(which egrep) || exit 1
-[ -z "$FIND_cmd" ] && FIND_cmd=$(which find) || exit 1
-[ -z "$GREP_cmd" ] && GREP_cmd=$(which grep) || exit 1
-[ -z "$LDAPADD_cmd" ] && LDAPADD_cmd=$(which ldapadd) || exit 1
-[ -z "$LDAPDELETE_cmd" ] && LDAPDELETE_cmd=$(which ldapdelete) || exit 1
-[ -z "$LDAPSEARCH_cmd" ] && LDAPSEARCH_cmd=$(which ldapsearch) || exit 1
-[ -z "$LN_cmd" ] && LN_cmd=$(which ln) || exit 1
-[ -z "$PRINTF_cmd" ] && PRINTF_cmd=$(which printf) || exit 1
-[ -z "$RM_cmd" ] && RM_cmd=$(which rm) || exit 1
-[ -z "$SED_cmd" ] && SED_cmd=$(which sed) || exit 1
-[ -z "$SORT_cmd" ] && SORT_cmd=$(which sort) || exit 1
-[ -z "$TAR_cmd" ] && TAR_cmd=$(which tar) || exit 1
-[ -z "$UNIQ_cmd" ] && UNIQ_cmd=$(which uniq) || exit 1
-[ -z "$READLINK_cmd" ] && READLINK_cmd=$(which readlink) || exit 1
+[ -z "$AWK_cmd" ] && AWK_cmd=$(which awk) || { no_command_error awk; exit 1 ;}
+[ -z "$CURL_cmd" ] && CURL_cmd=$(which curl) || { no_command_error curl; exit 1 ;}
+[ -z "$DATE_cmd" ] && DATE_cmd=$(which date) || { no_command_error date; exit 1 ;}
+[ -z "$DU_cmd" ] && DU_cmd=$(which du) || { no_command_error du; exit 1 ;}
+[ -z "$EGREP_cmd" ] && EGREP_cmd=$(which egrep) || { no_command_error egrep; exit 1 ;}
+[ -z "$FIND_cmd" ] && FIND_cmd=$(which find) || { no_command_error find; exit 1 ;}
+[ -z "$GREP_cmd" ] && GREP_cmd=$(which grep) || { no_command_error grep; exit 1 ;}
+[ -z "$LDAPADD_cmd" ] && LDAPADD_cmd=$(which ldapadd) || { no_command_error ldapadd; exit 1 ;}
+[ -z "$LDAPDELETE_cmd" ] && LDAPDELETE_cmd=$(which ldapdelete) || { no_command_error ldapdelete; exit 1 ;}
+[ -z "$LDAPSEARCH_cmd" ] && LDAPSEARCH_cmd=$(which ldapsearch) || { no_command_error ldapsearch; exit 1 ;}
+[ -z "$LN_cmd" ] && LN_cmd=$(which ln) || { no_command_error ln; exit 1 ;}
+[ -z "$PRINTF_cmd" ] && PRINTF_cmd=$(which printf) || { no_command_error printf; exit 1 ;}
+[ -z "$RM_cmd" ] && RM_cmd=$(which rm) || { no_command_error rm; exit 1 ;}
+[ -z "$SED_cmd" ] && SED_cmd=$(which sed) || { no_command_error sed; exit 1 ;}
+[ -z "$SORT_cmd" ] && SORT_cmd=$(which sort) || { no_command_error sort; exit 1 ;}
+[ -z "$TAR_cmd" ] && TAR_cmd=$(which tar) || { no_command_error tar; exit 1 ;}
+[ -z "$UNIQ_cmd" ] && UNIQ_cmd=$(which uniq) || { no_command_error uniq; exit 1 ;}
+[ -z "$READLINK_cmd" ] && READLINK_cmd=$(which readlink) || { no_command_error readlink; exit 1 ;}
 
 # Criticize the parameters passed on the command line
 while [ -n "$1" ];do
