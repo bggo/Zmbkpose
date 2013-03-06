@@ -705,10 +705,17 @@ function backup_account(){
 		[ ! -d "$user_bk_dir" ] && mkdir -p "$user_bk_dir"
 		backup_file=$(backup_create_file \
 			$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
+	elif [ -f "$backup_file" ];then 
+			error "File: \"$backup_file\", already exists."
+			return 1
 	fi
 
 	#Remove all if error, or return
-	trap "[ $? -ne 0 ] && rm -f $backup_file; rm -rf $backup_file.files;trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
+	trap "if [ $? -ne 0 ] ;then 
+			[ -f $backup_file ] && rm -f $backup_file; 
+		  fi ;
+		  [ -d $backup_file.files ] && rm -rf $backup_file.files;
+		  trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
 	mkdir -p ${backup_file}.files #Temporary files
 
 	debug "$account - START $mode backup ..."
@@ -963,7 +970,7 @@ function last_word(){
 #
 ##Error if no command
 function no_command_error(){
-	echo "ERROR:You dont have \"$1\" command, or it is not in your PATH" >&2
+	echo "ERROR:You don't have \"$1\" command, or it is not in your PATH" >&2
 }
 
 ###### MAIN ############
