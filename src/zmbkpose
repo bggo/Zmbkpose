@@ -1277,7 +1277,10 @@ case $action in
 				until [ "$(jobs -r|wc -l)" -lt $MAX_PARALLEL_PROCESS ]; do sleep 5 ; done
 				$do_FUNCTION $account "$mode" "$backup_to_file" &
 			else #Secuencial
-				$do_FUNCTION $account "$mode" "$backup_to_file"
+				#Trick for doing conditional the -e option
+				set +e ; ( set -e && $do_FUNCTION $account "$mode" "$backup_to_file") ; 
+				RET=$? ;  set -e
+				[ $RET -eq 0 -o -n "$CONT_ON_ERROR" ]
 			fi
 
 			let bk_count++ || true ; 
