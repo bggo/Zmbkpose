@@ -701,7 +701,7 @@ function backup_account(){
 	local user_bk_dir=${WORKDIR}/$account
 
 	#Backup to WORKDIR
-	if [ -z "$backup_file" ];then 
+	if [ -z "$backup_file" -a -z "$SIMULATE" ];then 
 		[ ! -d "$user_bk_dir" ] && mkdir -p "$user_bk_dir"
 		backup_file=$(backup_create_file \
 			$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
@@ -716,7 +716,9 @@ function backup_account(){
 		  fi ;
 		  [ -d $backup_file.files ] && rm -rf $backup_file.files;
 		  trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
-	mkdir -p ${backup_file}.files #Temporary files
+	if [ -z "$SIMULATE" ] ;then
+		mkdir -p ${backup_file}.files #Temporary files
+	fi
 
 	debug "$account - START $mode backup ..."
 
