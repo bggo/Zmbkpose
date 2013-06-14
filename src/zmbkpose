@@ -970,7 +970,7 @@ source $OSE_CONF/zmbkpose.conf
 #Trap INT, TERM signals, for close child process (util with parallel backups)
 trap "kill -s SIGTERM -- 0" SIGINT SIGTERM
 
-[ -z "$AWK_cmd" ] && AWK_cmd=$(which awk) || { no_command_error awk; exit 1 ;}
+[ -z "$AWK_cmd" ] && AWK_cmd=$(which gawk) || { no_command_error gawk; exit 1 ;}
 [ -z "$CURL_cmd" ] && CURL_cmd=$(which curl) || { no_command_error curl; exit 1 ;}
 [ -z "$DATE_cmd" ] && DATE_cmd=$(which date) || { no_command_error date; exit 1 ;}
 [ -z "$DU_cmd" ] && DU_cmd=$(which du) || { no_command_error du; exit 1 ;}
@@ -1218,6 +1218,12 @@ case $action in
 	(GET_BACKUPS_INFO|GET_FIRST_BACKUP_INFO|GET_LAST_BACKUP_INFO|DELETE_OLD_BACKUPS) 
 		[ -z "$WORKDIR" ] && \
 			error "CONFIG: You need to define WORKDIR." && exit 1
+    ;;
+	(*) #Incorrect action, or not specified
+		if [ -n "$action" ];then error "Incorrect action. Try --help for help."
+		else error "You need specify an action. Try --help for help."
+		fi
+		exit 1
     ;;
 esac
 
