@@ -40,6 +40,12 @@ ERR_NOBKPDIR="1"		# No backup directory could be found
 ERR_NOROOT="2"			# Script was run without root privileges
 ERR_DEPNOTFOUND="3"		# Missing dependency
 
+# Check if we have root before doing anything
+if [ $(id -u) -ne 0 ]; then
+	echo "You need root privileges to install zmbkpose"
+	exit $ERR_NOROOT
+fi
+
 # Try to guess missing settings as best as we can
 test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - zimbra -c zmhostname`
 test -z $ZIMBRA_ADDRESS  && ZIMBRA_ADDRESS=`grep $ZIMBRA_HOSTNAME /etc/hosts|awk '{print $1}'`
@@ -73,12 +79,6 @@ echo "Zmbkpose Settings Directory: $OSE_CONF"
 echo ""
 echo "Press ENTER to continue or CTRL+C to cancel."
 read tmp
-
-# Check if we have root before doing anything
-if [ $(id -u) -ne 0 ]; then
-	echo "You need root privileges to install zmbkpose"
-	exit $ERR_NOROOT
-fi
 
 # Check for missing installer files
 # TODO: MD5 check of the files
