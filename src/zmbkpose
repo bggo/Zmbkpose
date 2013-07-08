@@ -835,7 +835,7 @@ if [ -z "$LOGFILE" ]; then
 fi
 
 # Initialize some standard external commands
-CURL="$(which curl) -q -k"
+CURL="$(which curl) -s -k"
 
 # Criticize the parameters passed on the command line
 
