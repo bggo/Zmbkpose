@@ -184,15 +184,15 @@ backup_all_accounts_parallel()
 	for MAIL in $(grep @ $LISTALLACCOUNTS); do
 
 	        # Contador de processos curl simultaneos
-		# Simultaneous Curl Process counter
+		    # Simultaneous Curl Process counter
 	        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 
 	        if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
 	                MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
 	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                let COUNT++
 	        else
@@ -200,16 +200,16 @@ backup_all_accounts_parallel()
 	                do
 	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 	                        sleep 5
-	                        #echo "Max process number reached ($STAT). Waiting slot."
+	                        [ $VERBOSE -gt 0 ] && echo "Max process number reached ($STAT). Waiting slot."
 	                done
 
 			# Execution block
 	                # Bloco de execução
 	                MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
 	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                let COUNT++
 	                # Fim Bloco de execução
@@ -241,9 +241,9 @@ backup_all_accounts ()
 	for MAIL in $(grep @ $LISTALLACCOUNTS); do
         	MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+	        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
+	        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+	        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
 	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	done
 
@@ -284,9 +284,9 @@ backup_accounts_parallel ()
 	        if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
 	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	                MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+	                ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
 	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                let COUNT++
 	        else
@@ -300,9 +300,9 @@ backup_accounts_parallel ()
 			# Bloco de execução
 			$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 			MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+			${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
+			${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+			${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
 			echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 			let COUNT++
 			# Fim Bloco de execução
@@ -367,9 +367,9 @@ incremental_all_accounts ()
 	                else
 	                        MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	                        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
+	                        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
+	                        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
+	                        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
 # "
 	                        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                fi
@@ -431,9 +431,9 @@ backup_accounts ()
 
 	        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	        MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz
+	        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
+	        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz
+	        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz
 	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	        ((K = K+1))
 	        unset MAIL
@@ -487,9 +487,9 @@ incremental_accounts ()
         	                        ((K = K+1))
         	                else
         	                        MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
+        	                        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
+        	                        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
+        	                        ${CURL} -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
 	                                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
                                 	((K = K+1))
 	                        fi
@@ -555,9 +555,9 @@ restore_accounts ()
                                         	((K = K+1))
                                 	else
                                         	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
-	                                        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-        	                                $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
-        	                                $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
+	                                        ${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
+        	                                ${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
+        	                                ${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
         	                                ((K = K+1))
         	                                unset MAIL
                                 	fi
@@ -590,9 +590,9 @@ restore_on_box()
 				for SESSIONACCOUNT in $(cat $BKPSACCOUNT | awk -F: '{print $1}'); do
 					echo "Restoring from $SESSIONACCOUNT on $DEST"
 					MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')                                  	                                        	
-					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/?fmt=tgz
-					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Junk?fmt=tgz
-					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Trash?fmt=tgz
+					${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/?fmt=tgz
+					${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Junk?fmt=tgz
+					${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Trash?fmt=tgz
 					echo "$MAIL restored from  $SESSIONACCOUNT on $DEST"
                                 done
                                 	unset MAIL
@@ -638,9 +638,9 @@ restore_LDAP_account ()
                                         	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
                                         	$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}') 2>/dev/null
                                         	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
+                                        	${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
+                                        	${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
+                                        	${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
                                         	echo "$MAIL restored from  $SESSIONACCOUNT"
                                 	done
                                 	((K = K+1))
@@ -684,9 +684,9 @@ restore_all_accounts_parallel ()
 		        $(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN 2>/dev/null
 	        	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
 
-		        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &	
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
-		        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
+		        ${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &	
+			${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
+		        ${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
 
 			echo "$MAIL restored"
 		else
@@ -707,9 +707,9 @@ restore_all_accounts_parallel ()
 			$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $USERDN 2>/dev/null
 			$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
 
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
+			${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &
+			${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
+			${CURL} --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
 			echo "$MAIL restored"
 
 		fi
@@ -834,134 +834,148 @@ if [ -z "$LOGFILE" ]; then
         exit 0
 fi
 
+# Initialize some standard external commands
+VERBOSE=0
+CURL="$(which curl) -s -k"
+
 # Criticize the parameters passed on the command line
 
-case "$1" in
-"-f" )
-	if [ -z "$2" ]; then
-		if [ $PARALLEL_SUPPORT -eq 1  ];then
-			echo "Running the parallel backup"
-			backup_all_accounts_parallel
-		else
-			backup_all_accounts
-		fi
-	else
-		if [ -z "$3" ]; then
-			backup_accounts $2
-		else
-			echo "Incorrect $@ params. Read --help."
-			show_help
-		fi
-	fi
+while [ ! -z "$1" ] ; do
+    case "$1" in
+    "-v" )
+        shift
+        if [ -z "`echo $1 |egrep -e '^[0-9]*\$'`" ] ; then
+            show_help
+        else
+            VERBOSE=$1
+        fi
+    "-f" )
+        if [ -z "$2" ]; then
+            if [ $PARALLEL_SUPPORT -eq 1  ];then
+                echo "Running the parallel backup"
+                backup_all_accounts_parallel
+            else
+                backup_all_accounts
+            fi
+        else
+            if [ -z "$3" ]; then
+                backup_accounts $2
+            else
+                echo "Incorrect $@ params. Read --help."
+                show_help
+            fi
+        fi
 
-;;
-"-i" )
-	if [ -z "$2" ]; then
-		incremental_all_accounts
-	else
-		if [ -z "$3" ]; then
-			incremental_accounts $2
-		fi
-		echo "Incorrect $@ params. Read the --help."
-        	show_help
-	fi
-;;
-"-l" )
+    ;;
+    "-i" )
         if [ -z "$2" ]; then
-                list_sessions
-	else
-                echo "Incorrect $@ params. Read the --help."
+            incremental_all_accounts
+        else
+            if [ -z "$3" ]; then
+                incremental_accounts $2
+            fi
+            echo "Incorrect $@ params. Read the --help."
                 show_help
-	fi
-;;
-"-r" )
-        if [ -z "$2" ]; then
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	else
-		if [ -z "$4" ]; then
-			restore_accounts $2 $3
-		else
-                	echo "Incorrect $@ params. Read the --help."
-	                show_help
-		fi
-	fi
-;;
-"-restoreAccount" )
-        if [ -z "$2" ]; then
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	else
-		if [ -z "$3" ]; then
-			restore_LDAP_account $2
-		else
-			if [ "$3" = "--LDAPOnly" ]; then
-				restore_LDAP_account $2 $4
-			else
-	                	echo "Incorrect $@ params. Read the --help."
-		                show_help
-			fi
-		fi
-	fi
-	
-;;
-"--restoreAllAccounts" )
-	restore_all_accounts_parallel
-;;
-"--backupDistributionList" )
-        backup_distribution_list
-;;
-"--backupAlias" )
-        backup_alias
-;;
-"--restoreAlias" )
-	restore_alias
-;;
-"--restoreDistributionList" )
-	restore_distribution_list
-;;
-"--restoreOnAccount" )
-	if ! [   -z $2 -o -z $3    ]; then
-        	restore_on_box $2 $3
-	fi
-;;
-"-d" )
-	if [ -z "$2" ]; then
-	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-		show_help
-		exit 0
-	fi
-	if [ $2 -eq $2 2> /dev/null ]; then
-		if [ -z "$3" ]; then
-		  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 days"`
-		else
-			case "$3" in
-			"weeks" )
-			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 weeks"`
-			;;
-			"months" )
-			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 months"`
-			;;
-			* )
-		          echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-         		  show_help
-			  exit 0
-			;;
-			esac
-		fi
-		rotate_backup $OLDEST
-	else
-	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-		show_help
-		exit 0
-	fi
-;;
+        fi
+    ;;
+    "-l" )
+            if [ -z "$2" ]; then
+                    list_sessions
+        else
+                    echo "Incorrect $@ params. Read the --help."
+                    show_help
+        fi
+    ;;
+    "-r" )
+            if [ -z "$2" ]; then
+                    echo "Incorrect $@ params. Read the --help."
+                    show_help
+        else
+            if [ -z "$4" ]; then
+                restore_accounts $2 $3
+            else
+                        echo "Incorrect $@ params. Read the --help."
+                        show_help
+            fi
+        fi
+    ;;
+    "-restoreAccount" )
+            if [ -z "$2" ]; then
+                    echo "Incorrect $@ params. Read the --help."
+                    show_help
+        else
+            if [ -z "$3" ]; then
+                restore_LDAP_account $2
+            else
+                if [ "$3" = "--LDAPOnly" ]; then
+                    restore_LDAP_account $2 $4
+                else
+                            echo "Incorrect $@ params. Read the --help."
+                            show_help
+                fi
+            fi
+        fi
 
-* )
-	echo "Incorrect parameters $@. See help."
-	show_help
-;;
-esac
+    ;;
+    "--restoreAllAccounts" )
+        restore_all_accounts_parallel
+    ;;
+    "--backupDistributionList" )
+            backup_distribution_list
+    ;;
+    "--backupAlias" )
+            backup_alias
+    ;;
+    "--restoreAlias" )
+        restore_alias
+    ;;
+    "--restoreDistributionList" )
+        restore_distribution_list
+    ;;
+    "--restoreOnAccount" )
+        if ! [   -z $2 -o -z $3    ]; then
+                restore_on_box $2 $3
+        fi
+    ;;
+    "-d" )
+        if [ -z "$2" ]; then
+                echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+            show_help
+            exit 0
+        fi
+        if [ $2 -eq $2 2> /dev/null ]; then
+            if [ -z "$3" ]; then
+              OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 days"`
+            else
+                case "$3" in
+                "weeks" )
+                  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 weeks"`
+                ;;
+                "months" )
+                  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 months"`
+                ;;
+                * )
+                      echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+                      show_help
+                  exit 0
+                ;;
+                esac
+            fi
+            rotate_backup $OLDEST
+        else
+                echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+            show_help
+            exit 0
+        fi
+    ;;
+
+    * )
+        echo "Incorrect parameters $@. See help."
+        show_help
+    ;;
+    esac
+    shift
+done
 exit 0
 
 # Ações do script
