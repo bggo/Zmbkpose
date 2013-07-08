@@ -184,7 +184,7 @@ backup_all_accounts_parallel()
 	for MAIL in $(grep @ $LISTALLACCOUNTS); do
 
 	        # Contador de processos curl simultaneos
-		# Simultaneous Curl Process counter
+		    # Simultaneous Curl Process counter
 	        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 
 	        if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
@@ -200,7 +200,7 @@ backup_all_accounts_parallel()
 	                do
 	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 	                        sleep 5
-	                        #echo "Max process number reached ($STAT). Waiting slot."
+	                        [ $VERBOSE -gt 0 ] && echo "Max process number reached ($STAT). Waiting slot."
 	                done
 
 			# Execution block
@@ -835,136 +835,147 @@ if [ -z "$LOGFILE" ]; then
 fi
 
 # Initialize some standard external commands
+VERBOSE=0
 CURL="$(which curl) -s -k"
 
 # Criticize the parameters passed on the command line
 
-case "$1" in
-"-f" )
-	if [ -z "$2" ]; then
-		if [ $PARALLEL_SUPPORT -eq 1  ];then
-			echo "Running the parallel backup"
-			backup_all_accounts_parallel
-		else
-			backup_all_accounts
-		fi
-	else
-		if [ -z "$3" ]; then
-			backup_accounts $2
-		else
-			echo "Incorrect $@ params. Read --help."
-			show_help
-		fi
-	fi
+while [ ! -z "$1" ] ; do
+    case "$1" in
+    "-v" )
+        shift
+        if [ -z "`echo $1 |egrep -e '^[0-9]*\$'`" ] ; then
+            show_help
+        else
+            VERBOSE=$1
+        fi
+    "-f" )
+        if [ -z "$2" ]; then
+            if [ $PARALLEL_SUPPORT -eq 1  ];then
+                echo "Running the parallel backup"
+                backup_all_accounts_parallel
+            else
+                backup_all_accounts
+            fi
+        else
+            if [ -z "$3" ]; then
+                backup_accounts $2
+            else
+                echo "Incorrect $@ params. Read --help."
+                show_help
+            fi
+        fi
 
-;;
-"-i" )
-	if [ -z "$2" ]; then
-		incremental_all_accounts
-	else
-		if [ -z "$3" ]; then
-			incremental_accounts $2
-		fi
-		echo "Incorrect $@ params. Read the --help."
-        	show_help
-	fi
-;;
-"-l" )
+    ;;
+    "-i" )
         if [ -z "$2" ]; then
-                list_sessions
-	else
-                echo "Incorrect $@ params. Read the --help."
+            incremental_all_accounts
+        else
+            if [ -z "$3" ]; then
+                incremental_accounts $2
+            fi
+            echo "Incorrect $@ params. Read the --help."
                 show_help
-	fi
-;;
-"-r" )
-        if [ -z "$2" ]; then
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	else
-		if [ -z "$4" ]; then
-			restore_accounts $2 $3
-		else
-                	echo "Incorrect $@ params. Read the --help."
-	                show_help
-		fi
-	fi
-;;
-"-restoreAccount" )
-        if [ -z "$2" ]; then
-                echo "Incorrect $@ params. Read the --help."
-                show_help
-	else
-		if [ -z "$3" ]; then
-			restore_LDAP_account $2
-		else
-			if [ "$3" = "--LDAPOnly" ]; then
-				restore_LDAP_account $2 $4
-			else
-	                	echo "Incorrect $@ params. Read the --help."
-		                show_help
-			fi
-		fi
-	fi
-	
-;;
-"--restoreAllAccounts" )
-	restore_all_accounts_parallel
-;;
-"--backupDistributionList" )
-        backup_distribution_list
-;;
-"--backupAlias" )
-        backup_alias
-;;
-"--restoreAlias" )
-	restore_alias
-;;
-"--restoreDistributionList" )
-	restore_distribution_list
-;;
-"--restoreOnAccount" )
-	if ! [   -z $2 -o -z $3    ]; then
-        	restore_on_box $2 $3
-	fi
-;;
-"-d" )
-	if [ -z "$2" ]; then
-	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-		show_help
-		exit 0
-	fi
-	if [ $2 -eq $2 2> /dev/null ]; then
-		if [ -z "$3" ]; then
-		  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 days"`
-		else
-			case "$3" in
-			"weeks" )
-			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 weeks"`
-			;;
-			"months" )
-			  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 months"`
-			;;
-			* )
-		          echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-         		  show_help
-			  exit 0
-			;;
-			esac
-		fi
-		rotate_backup $OLDEST
-	else
-	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
-		show_help
-		exit 0
-	fi
-;;
+        fi
+    ;;
+    "-l" )
+            if [ -z "$2" ]; then
+                    list_sessions
+        else
+                    echo "Incorrect $@ params. Read the --help."
+                    show_help
+        fi
+    ;;
+    "-r" )
+            if [ -z "$2" ]; then
+                    echo "Incorrect $@ params. Read the --help."
+                    show_help
+        else
+            if [ -z "$4" ]; then
+                restore_accounts $2 $3
+            else
+                        echo "Incorrect $@ params. Read the --help."
+                        show_help
+            fi
+        fi
+    ;;
+    "-restoreAccount" )
+            if [ -z "$2" ]; then
+                    echo "Incorrect $@ params. Read the --help."
+                    show_help
+        else
+            if [ -z "$3" ]; then
+                restore_LDAP_account $2
+            else
+                if [ "$3" = "--LDAPOnly" ]; then
+                    restore_LDAP_account $2 $4
+                else
+                            echo "Incorrect $@ params. Read the --help."
+                            show_help
+                fi
+            fi
+        fi
 
-* )
-	echo "Incorrect parameters $@. See help."
-	show_help
-;;
-esac
+    ;;
+    "--restoreAllAccounts" )
+        restore_all_accounts_parallel
+    ;;
+    "--backupDistributionList" )
+            backup_distribution_list
+    ;;
+    "--backupAlias" )
+            backup_alias
+    ;;
+    "--restoreAlias" )
+        restore_alias
+    ;;
+    "--restoreDistributionList" )
+        restore_distribution_list
+    ;;
+    "--restoreOnAccount" )
+        if ! [   -z $2 -o -z $3    ]; then
+                restore_on_box $2 $3
+        fi
+    ;;
+    "-d" )
+        if [ -z "$2" ]; then
+                echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+            show_help
+            exit 0
+        fi
+        if [ $2 -eq $2 2> /dev/null ]; then
+            if [ -z "$3" ]; then
+              OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 days"`
+            else
+                case "$3" in
+                "weeks" )
+                  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 weeks"`
+                ;;
+                "months" )
+                  OLDEST=`date  +%Y%m%d%H%M%S -d "-$2 months"`
+                ;;
+                * )
+                      echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+                      show_help
+                  exit 0
+                ;;
+                esac
+            fi
+            rotate_backup $OLDEST
+        else
+                echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
+            show_help
+            exit 0
+        fi
+    ;;
+
+    * )
+        echo "Incorrect parameters $@. See help."
+        show_help
+    ;;
+    esac
+    shift
+done
 exit 0
 
 # Ações do script
