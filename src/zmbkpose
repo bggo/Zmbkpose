@@ -48,7 +48,7 @@ show_help ()
     -a act[,act]... Operates on specific accounts. Default all.
     --admuser user  Use \"user\" as admin user for access to mailboxes
     --admpw pw      Use \"pw\" as admin user password for access to mailboxes
-    --bf file       Backup to a specific tar file(don't use WORKDIR) 
+    --bf file       Backup to a specific tar file(don't use WORKDIR). Use - for stdout
     -c n            Limits the number of accounts in backups to "n"
     -chldaph        In the restore in a different host, try to change some 
 	                 attributes of LDAP for account work
@@ -426,16 +426,17 @@ function is_date_time_mark()
 ################################################################################
 
 #
-## Create a destination backup file. Name is critical for avoid duplicates
-function backup_create_file(){
+## Create a uniq file or directory (mktemp is avoided by implementation differences)
+function l_mktemp(){
 	local dir="$1"
-	local fid="$2"
+	local fid="${2:-1}"
 	local ending="$3"
-        local msg=""
+	local el_type=${4:-f} #f:file d:directory
+	local msg=""
 	local max_wait_sec=6
  	local start_tt=$(time_cur_tt)
 
-	#Locking for create a number
+	#Locking for create element
 	while ! msg=$(mkdir $dir.lock 2>&1) ;do 
 		[ "$(( $(time_cur_tt) - $start_tt ))" -gt $max_wait_sec ] && \
 			echo $msg >&2 && return 1 
@@ -443,7 +444,11 @@ function backup_create_file(){
 	done
 
 	while [ -f $dir/${fid}${ending} ];do let fid++ ;done
-	touch $dir/${fid}${ending}
+	if [ $el_type = d ];then
+		mkdir $dir/${fid}${ending}
+	else
+		touch $dir/${fid}${ending}
+	fi
 
 	#Release lock
 	rm -rf $dir.lock
@@ -687,11 +692,17 @@ function backup_account(){
 	local query="$4"
 	local init_tt=$(time_cur_tt)
 	local user_bk_dir=${WORKDIR}/$account
+	local tmp_dir=''
+	
+	#Temporary dir for generate files
+	if [ -z "$SIMULATE" ] ;then
+		tmp_dir=$(l_mktemp ${WORKDIR} '' '' d)
+	fi
 
 	#Backup to WORKDIR
 	if [ -z "$backup_file" -a -z "$SIMULATE" ];then 
-		[ ! -d "$user_bk_dir" ] && mkdir -p "$user_bk_dir"
-		backup_file=$(backup_create_file \
+		[ -d "$user_bk_dir" ] || mkdir -p "$user_bk_dir"
+		backup_file=$(l_mktemp \
 			$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
 	elif [ -f "$backup_file" ];then 
 			error "File: \"$backup_file\", already exists."
@@ -701,27 +712,25 @@ function backup_account(){
 	#Remove all if error, or return
 	trap "if [ $? -ne 0 ] ;then 
 			[ -f $backup_file ] && rm -f $backup_file; 
-		  fi ;
-		  [ -d $backup_file.files ] && rm -rf $backup_file.files;
-		  trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
-	if [ -z "$SIMULATE" ] ;then
-		mkdir -p ${backup_file}.files #Temporary files
-	fi
+	      fi ;
+	      [ -d $tmp_dir ] && rm -rf $tmp_dir;
+	      trap ERR;trap RETURN;trap SIGINT" ERR RETURN SIGINT
 
 	debug "$account - START $mode backup ..."
 
 	#Ldap backup
-	local ldap_bkf=${backup_file}.files/$LDAP_FILE_IN_TAR
+	local ldap_bkf=${tmp_dir}/$LDAP_FILE_IN_TAR
 	debug "$account - Doing ldap backup ..."
 	if [ -z "$SIMULATE" ] ;then
 		zimbra_ldap_backup "$account" $ldap_bkf 
 		debug "$account - ldap backup complete"
 	fi
 
-	[ -n "$SIMULATE" ] && debug "$account - Doing mailbox backup ..." && return 0
-
-	#Mailbox backup is dependent on the type of account
-	local mbox_bkf=${backup_file}.files/$MAILBOX_FILE_IN_TAR
+	#Mailbox backup
+	debug "$account - Doing mailbox backup ..."
+	[ -z "$SIMULATE" ] || return 0 # Nothing else to do
+	local mbox_bkf=${tmp_dir}/$MAILBOX_FILE_IN_TAR
+	# backup is dependent on the type of account
 	local ac_type;ac_type=$(cat $ldap_bkf|ldif_analysis_account_type $ldap_bkf) 
 	if [ "$ac_type" != ACCOUNT ];then 
 		debug "$account - No a mail account. Skipping mailbox backup." 
@@ -737,19 +746,25 @@ function backup_account(){
 	fi
 
 	#Final backup file
-	[ -s "$ldap_bkf" ] && \
-		$TAR_cmd -r -C $(dirname $ldap_bkf) -f $backup_file $(basename "$ldap_bkf")
-	[ -s "$mbox_bkf" ] && \
-		$TAR_cmd -r -C $(dirname $ldap_bkf) -f $backup_file $(basename "$mbox_bkf")
+	local files_in_tar=''
+	[ ! -s "$ldap_bkf" ] || files_in_tar="$files_in_tar $(basename $ldap_bkf)"
+	[ ! -s "$mbox_bkf" ] || files_in_tar="$files_in_tar $(basename $mbox_bkf)" 
+	if [ "$backup_file" = - ];then #Backup to stdout?
+		l_TAR_ARGS="$TAR_ARGS -O"
+	else
+		l_TAR_ARGS="$TAR_ARGS -f $backup_file"
+	fi
+	[ -z "$files_in_tar" ] || $TAR_cmd -c -C ${tmp_dir} $l_TAR_ARGS $files_in_tar
+	[ ! -f "$backup_file" ] || debug "$account - generated tar file $backup_file"
 
 	#Link to last backup
-	if [ -f $backup_file ] &&
-		[ "${backup_file#$WORKDIR}" != "$backup_file" ];then #file in WORKDIR
-		$LN_cmd -fs ${backup_file##*/} ${backup_file%/*}/LAST
-		debug "$account - END in $(( $(time_cur_tt) - $init_tt ))secs," \
-			"using $($DU_cmd -h $backup_file|$AWK_cmd '{print $1}')"
+	if [ -f $backup_file ] ;then
+		debug "$account - backup size is $($DU_cmd -h $backup_file|$AWK_cmd '{print $1}')"
+		if [ "${backup_file#$WORKDIR}" != "$backup_file" ];then #file in WORKDIR
+			$LN_cmd -fs ${backup_file##*/} ${backup_file%/*}/LAST
+		fi
 	fi
-	return 0
+	debug "$account - END in $(( $(time_cur_tt) - $init_tt ))secs,"
 }
 
 backup_account_incremental()
@@ -1010,7 +1025,7 @@ while [ -n "$1" ];do
 		(--bf) #Backup to a specific file(don't use WORKDIR)
 			[ -z "$2" ] && show_help && exit 
 			backup_to_file="$2"
-			if [ -f "$backup_to_file" ] ;then
+			if [ "$backup_to_file" != - -a -f "$backup_to_file" ] ;then
 				error "File: \"$backup_to_file\", already exists."
 				exit 1
 			fi
