@@ -437,7 +437,7 @@ function l_mktemp(){
  	local start_tt=$(time_cur_tt)
 
 	#Locking for create element
-	while ! msg=$(mkdir $dir.lock 2>&1) ;do 
+	while ! msg=$(mkdir $dir/lock 2>&1) ;do 
 		[ "$(( $(time_cur_tt) - $start_tt ))" -gt $max_wait_sec ] && \
 			echo $msg >&2 && return 1 
 		sleep 1
@@ -451,7 +451,7 @@ function l_mktemp(){
 	fi
 
 	#Release lock
-	rm -rf $dir.lock
+	rm -rf $dir/lock
 	echo $dir/${fid}${ending}
 }
 
