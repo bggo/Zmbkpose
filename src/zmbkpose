@@ -313,8 +313,18 @@ function zimbra_mailbox_backup()
 
 	[ -n "$search_query" ] && search_query="&$search_query"
 
-	$CURL_cmd $CURL_args -u $ADMINUSER:$ADMINPASS -o "$backup_file" \
-		"https://$mailhost:7071/home/$mailbox/?fmt=tgz$search_query" 
+	#Because sporadic ssl error, we will try several times. See issues 35.
+	for i in 1 2 3 4;do
+		if ! $CURL_cmd $CURL_args -u $ADMINUSER:$ADMINPASS -o "$backup_file" \
+			"https://$mailhost:7071/homei/$mailbox/?fmt=tgz$search_query" ;then
+			case $? in 
+				35) debug "Retry $i to https://$mailhost:7071 by SSL error";continue ;; 
+				*) return 1;; #Another errors
+			esac
+		fi
+		return 0
+	done
+	return 1
 }
 
 zimbra_mailbox_restore()
