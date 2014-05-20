@@ -453,7 +453,7 @@ function l_mktemp(){
 		sleep 1
 	done
 
-	while [ -f $dir/${fid}${ending} ];do let fid++ ;done
+	while [ -f $dir/${fid}${ending} -o -d $dir/${fid}${ending} ];do let fid++ ;done
 	if [ $el_type = d ];then
 		mkdir $dir/${fid}${ending}
 	else
