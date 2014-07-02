@@ -866,10 +866,8 @@ restore_account()
 		fi
 		#Restore
 		if ! $TAR_cmd -tf "$tar_bkfile" $MAILBOX_FILE_IN_TAR >/dev/null 2>&1;then
-			error "file $MAILBOX_FILE_IN_TAR does not exists in tar file \"$tar_bkfile\""
-			return 1
-		fi
-		if [ -z "$SIMULATE" ] ;then
+			debug "file $MAILBOX_FILE_IN_TAR does not exists in tar file \"$tar_bkfile\".  Skipping mailbox restore"
+		elif [ -z "$SIMULATE" ] ;then
 			$TAR_cmd -O -xf "$tar_bkfile" $MAILBOX_FILE_IN_TAR| \
 				zimbra_mailbox_restore "$account" "$mailhost" 
 		fi
