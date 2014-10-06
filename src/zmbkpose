@@ -680,14 +680,18 @@ function get_accounts_in_order_of_need_backup(){
 		get_from_backup_file_name DATE_TIME_MARK ACCOUNT |\
 		$SORT_cmd | $AWK_cmd '{print $2}'
 	)
+	debug "$(echo $accounts_in_storage|$WC_cmd -w) accounts in backup storage"
+
 	#Accts. in ldap
 	accounts_in_ldap=$(ldap_get_groups ; ldap_get_accts)
+	debug "$(echo $accounts_in_ldap|$WC_cmd -w) accounts in ldap server"
 
 	#Accts. without backup (diff btw. accounts_in_ldap and accounts_in_storage)
 	accounts_without_bk=$(
 		diff -u <(for a in $accounts_in_ldap;do echo $a;done|sort) \
 		  <(for a in $accounts_in_storage;do echo $a;done|sort)| \
 		$GREP_cmd '^-[^-]'| $SED_cmd 's/^-//')
+	debug "$(echo $accounts_without_bk |$WC_cmd -w) accounts without backup"
 
 	#First accounts without backup, then accounts in order of need backup 
 	echo $accounts_without_bk $accounts_in_storage
@@ -1010,6 +1014,7 @@ trap "kill -s SIGTERM -- 0" SIGINT SIGTERM
 [ -z "$SORT_cmd" ] && SORT_cmd=$(which sort) || { no_command_error sort; exit 1 ;}
 [ -z "$TAR_cmd" ] && TAR_cmd=$(which tar) || { no_command_error tar; exit 1 ;}
 [ -z "$UNIQ_cmd" ] && UNIQ_cmd=$(which uniq) || { no_command_error uniq; exit 1 ;}
+[ -z "$WC_cmd" ] && WC_cmd=$(which wc) || { no_command_error wc; exit 1 ;}
 [ -z "$READLINK_cmd" ] && READLINK_cmd=$(which readlink) || { no_command_error readlink; exit 1 ;}
 
 # Criticize the parameters passed on the command line
@@ -1201,6 +1206,16 @@ while [ -n "$1" ];do
 			CONT_ON_ERROR=1
 			shift 1
 		;;
+		(--xtrace) #bash xtrace=> From man bash: After  expanding each simple 
+		           # command, for command, case command, select command, or
+                   # or arithmetic for command, display the expanded value of
+				   # PS4, followed by the command and its expanded arguments 
+				   # or associated word list.
+			debug "Enabling bash xtrace (set -x)..."
+			set -x 
+			shift 1
+		;;
+
 		(*) #Error
 			error "Incorrect parameters $1. See help."
 			show_help
