@@ -1,0 +1,14 @@
+
+ Very important thinks to do (I think):
+ ----------------------------------
+  * "curl" is used for download off mailbox backup  via http from zimbra.
+   Restore is too via "curl", but zimbra can fall down on a memory limit
+    problem when uses big files. 
+   Options: download little files in backup, or split the backup for 
+    upload. What you think
+
+
+ Things that I think may be useful:
+ ----------------------------------
+  * Add option for backup distribution list only
+  * Restore on another mailbox account

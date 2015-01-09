@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ############################# Zmbkpose ################################
 
 The zmbkpose tool is a shell script that does hot backup and hot restore of ZCS
- Opensource accounts, GPL(OPENSOURCE). It can run from any host in the net, 
+ Opensource accounts. It can run from any host in the net, 
 which means that it can be set on a backup server already existent.
 
 It was concepted after Zimbra released ZCS 5.0.12, where a new import/export 
@@ -35,6 +35,7 @@ Till now, zmbkpose provides
 ################################################################################
 ################################################################################
           This tool DOES NOT DO disaster recovery. 
+          Only accounts is in backups
 ################################################################################
 ################################################################################
 
@@ -43,7 +44,7 @@ Till now, zmbkpose provides
 # For installation instructions please read the INSTALL file.
 
 #######################################################################
-# About this rewrite job:
+# About "rewrite_proposal_v2.0" :
  Zmbkpose is a great project.
  After using it, I started to need some features that were not available and I 
   wanted to add.
@@ -58,12 +59,21 @@ Till now, zmbkpose provides
   changes in the code, I was more simple rewrite and incorporate other needs 
   arising in my organization. Besides trying to make the code more efficient.
 
+ Use backup files directly, without additional metadata is slower, but  
+   but making an effort in the code for good performance.
+
  From my point of view rewriting code can be taken as offensive, and selfish. 
  This was not my intention, and I do not want to step on the original code zmbkpose.
 
  Zmbkpose programmers: If this code is offensive, please remove it.
 
  Thanks for giving me a solution to my open source zimbra installation.
+
+#######################################################################
+# "rewrite_proposal_v2.0" plans:
+ I write this code for specific needs, and I try to manteint it occasionally.
+ I have very little time to the project. I need help if you want to improve it.
+ Watch file "Things_to_do.txt"
 
 #######################################################################
 # Usage:
@@ -76,6 +86,7 @@ Index:
   04 - Usage instructions 
   05 - Usage recommendations 
   06 - Usage example
+  07 - Restore
 
 
 01 - How zmbkpose obtains data for backups?
@@ -265,4 +276,26 @@ LOG_FILE=$(/bin/date '+%Y.%m.%d_%H.%M.%S').log
 #Remove old logs
 0 22 * * * backupmail find /var/log/zmbkpose -type f -mtime +30 -exec ls '{}' \;
 --------------------------------------------------------------------------------
+
+
+07 - Restore
+   -----------------------------------------------------------------------------
+
+  The restoration is on the mail account in which the backup was performed.
+  There is no option to restore to another account. At least for now.
+  This means that if you restore to an existing account, then this will be
+    completed with the emails that are in the backup, and do not exist in the 
+    account.
+
+  If you do not want this, my suggestion is that:
+   1) rename the account from the administration panel zimbra
+   2) restore the backup. This will create the email account with the original 
+       name again.
+   3) The user enters the account restored, search emails interest group them
+       in a folder and perform backup of that folder from the account 
+       preferences.
+   4) delete the account restored
+   5) rename the account from step 1 post to its original name
+   6) The user enters the email account, and import from zimbra preferences, 
+       backup done previously with the emails of interest in step 3.
 
