@@ -436,6 +436,13 @@ function is_date_time_mark()
 ################################################################################
 
 #
+## Convet user@domain to domain/user
+function convert_account_to_structure(){
+	local account=$1
+	echo $(echo $account | awk -F'@' '{print $2"/"$1}')
+}
+
+#
 ## Create a uniq file or directory (mktemp is avoided by implementation differences)
 function l_mktemp(){
 	local dir="$1"
@@ -476,16 +483,16 @@ function get_backups_account(){
 	[ -n "$order" -a "$order" != ASC -a "$order" != DESC ] && order=ASC
 	local sort_order=''; [ "$order" = DESC ] && sort_order='-r'
 
-	[ ! -d "${WORKDIR}/$account" ] && return 0 
+	[ ! -d "${WORKDIR}/$(convert_account_to_structure $account)" ] && return 0
 
 	#LAST link exists?
-	if [ "$position" = LAST  -a -L "${WORKDIR}/$account/LAST" -a \
-		-f $($READLINK_cmd -f "${WORKDIR}/$account/LAST") ] ;then 
-		$READLINK_cmd -f "${WORKDIR}/$account/LAST"
+	if [ "$position" = LAST  -a -L "${WORKDIR}/$(convert_account_to_structure $account)/LAST" -a \
+		-f $($READLINK_cmd -f "${WORKDIR}/$(convert_account_to_structure $account)/LAST") ] ;then
+		$READLINK_cmd -f "${WORKDIR}/$(convert_account_to_structure $account)/LAST"
 		return 0
 	fi
 
-	$FIND_cmd "${WORKDIR}/$account" -maxdepth 1 -mindepth 1 -type f|\
+	$FIND_cmd "${WORKDIR}/$(convert_account_to_structure $account)" -maxdepth 1 -mindepth 1 -type f|\
 		$SORT_cmd $sort_order |\
 		( if [ "$position" = LAST ];then
 			$SED_cmd -n '$p' 
@@ -556,7 +563,7 @@ function get_last_backup_cycle_prior_to(){
 #
 ## Get accounts with backups
 function get_accounts_in_backups(){
-	$FIND_cmd "${WORKDIR}" -maxdepth 1 -mindepth 1 -type d \
+	$FIND_cmd "${WORKDIR}" -maxdepth 2 -mindepth 2 -type d \
 		|get_from_backup_file_name ACCOUNT
 }
 
@@ -599,13 +606,15 @@ function get_from_backup_file_name(){
 	while [ -n "$1" ];do
 		case "$1" in
 			WORKDIR)	 	  what="${what}${what:+ }\1";;
-			ACCOUNT)	 	  what="${what}${what:+ }\2";;
-			DATE_TIME_MARK)   what="${what}${what:+ }\3";;
-			DATE_TIME_MARK_H) what="${what}${what:+ }<dc \3 >"; local dc=1;;
-			FULL_INC)	 	  what="${what}${what:+ }\4";;
-			ARCH_FORMAT) 	  what="${what}${what:+ }\5";;
-			FULL_PATH) 		  what="${what}${what:+ }\1\/\2\/\3\:\4\.\5";;
-			H_SIZE) 	      what="${what}${what:+ }\6";local cs=1;local u=$1;;
+			DOMAIN)		 	  what="${what}${what:+ }\2";;
+			EMAIL)			  what="${what}${what:+ }\3";;
+			ACCOUNT)	 	  what="${what}${what:+ }\3\@\2";;
+			DATE_TIME_MARK)   what="${what}${what:+ }\4";;
+			DATE_TIME_MARK_H) what="${what}${what:+ }<dc \4 >"; local dc=1;;
+			FULL_INC)	 	  what="${what}${what:+ }\5";;
+			ARCH_FORMAT) 	  what="${what}${what:+ }\6";;
+			FULL_PATH) 		  what="${what}${what:+ }\1\/\2\/\3\/\4\:\5\.\6";;
+			H_SIZE) 	      what="${what}${what:+ }\7";local cs=1;local u=$1;;
 			*) true;;	
 		esac
 		shift 1
@@ -614,7 +623,7 @@ function get_from_backup_file_name(){
 	cat $@| \
 	  if [ -n "$cs" ];then calc_files_size_in_stdin '|' $u;else cat;fi |\
 	  $SED_cmd -n -r \
-	    "s/(${WORKDIR//\//\\/})\/([A-Za-z0-9._%+-]+\@[A-Za-z0-9._%+-]+)\/?([0-9]{14})?\:?($FULL_MARK|$INC_MARK)?\.?(tar)?\|?([0-9]+[BKMGT])?(.*)/$what/p" |\
+	    "s/(${WORKDIR//\//\\/})\/([A-Za-z0-9._%+-]+)\/([A-Za-z0-9._%+-]+)\/?([0-9]{14})?\:?($FULL_MARK|$INC_MARK)?\.?(tar)?\|?([0-9]+[BKMGT])?(.*)/$what/p" |\
 	  if [ -z "$dc" ];then cat ;else pipe_date_time_conv ;fi # Date conversion 
 }
 
@@ -675,7 +684,7 @@ get_account_backups_info(){
 function get_accounts_in_order_of_need_backup(){
 	#Accts. in order of need backup, storage-based backup information
 	accounts_in_storage=$(
-	  $FIND_cmd -P "${WORKDIR}" -maxdepth 2 -mindepth 1 \
+	  $FIND_cmd -P "${WORKDIR}" -maxdepth 3 -mindepth 2 \
 		-type l -regex '.*/LAST' -printf "%h/%l\n" |\
 		get_from_backup_file_name DATE_TIME_MARK ACCOUNT |\
 		$SORT_cmd | $AWK_cmd '{print $2}'
@@ -705,7 +714,7 @@ function backup_account(){
 	local backup_file="$3"
 	local query="$4"
 	local init_tt=$(time_cur_tt)
-	local user_bk_dir=${WORKDIR}/$account
+	local user_bk_dir=${WORKDIR}/$(convert_account_to_structure $account)
 	local tmp_dir=''
 	
 	#Temporary dir for generate files
