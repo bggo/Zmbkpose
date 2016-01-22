@@ -31,6 +31,10 @@
 #                                               <william.welter@4linux.com.br>
 #                                               <wfelipew@gmail.com>
 #
+# 17/12/2014 - Version 2.1 Beta - By Rafael Mendonca
+#                                               <rafael.mendonca@4linux.com.br>
+#                                               <rafaelmendonca3f@gmail.com>
+#
 #
 
 show_help ()
@@ -191,15 +195,19 @@ backup_all_accounts_parallel()
 	                MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+					if [ ${SPAM_BACKUP} -eq 1 ];then 
+		                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+					fi
+					if [ ${TRASH_BACKUP} -eq 1 ];then
+	                	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+					fi
 	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                let COUNT++
 	        else
 	                until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
 	                do
 	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	                        sleep 5
+	                        sleep 3
 	                        #echo "Max process number reached ($STAT). Waiting slot."
 	                done
 
@@ -208,8 +216,12 @@ backup_all_accounts_parallel()
 	                MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+					if [ ${SPAM_BACKUP} -eq 1 ];then
+	    	            $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+					fi
+					if [ ${TRASH_BACKUP} -eq 1 ];then
+	                	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+					fi
 	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                let COUNT++
 	                # Fim Bloco de execução
@@ -242,8 +254,12 @@ backup_all_accounts ()
         	MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+			if [ ${SPAM_BACKUP} -eq 1 ];then
+	        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+			fi
+			if [ ${TRASH_BACKUP} -eq 1 ];then
+	        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+			fi
 	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	done
 
@@ -285,15 +301,19 @@ backup_accounts_parallel ()
 	                $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	                MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
 	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-	                $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+					if [ ${SPAM_BACKUP} -eq 1 ];then
+	                	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+					fi
+					if [ ${TRASH_BACKUP} -eq 1 ];then
+	                	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+					fi
 	                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                let COUNT++
 	        else
 	                until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
 	                do
 	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	                        sleep 5
+	                        sleep 3
 	                        #"Número máximo de processos atingido ($STAT). Aguardando vaga."
 	                done
 
@@ -301,8 +321,12 @@ backup_accounts_parallel ()
 			$(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 			MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
 			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz &
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
-			$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+			if [ ${SPAM_BACKUP} -eq 1 ];then
+				$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz &
+			fi
+			if [ ${TRASH_BACKUP} -eq 1 ];then
+				$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
+			fi
 			echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 			let COUNT++
 			# Fim Bloco de execução
@@ -368,8 +392,12 @@ incremental_all_accounts ()
 	                        MAILHOST=$(grep -A1 ^$MAIL $LISTALLACCOUNTS| grep -v @)
 	                        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
-	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
+							if [ ${SPAM_BACKUP} -eq 1 ];then
+	                        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
+							fi
+							if [ ${TRASH_BACKUP} -eq 1 ];then
+	                        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
+							fi
 # "
 	                        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	                fi
@@ -432,8 +460,12 @@ backup_accounts ()
 	        $(which ldapsearch) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -w $LDAPZIMBRAPASS -b '' -LLL "(zimbraMailDeliveryAddress=$MAIL)" > $TEMPDIR/$MAIL.ldiff
 	        MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
 	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz > $TEMPDIR/$MAIL.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz
-	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz
+			if [ ${SPAM_BACKUP} -eq 1 ];then
+	        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz > $TEMPDIR/$MAIL.Junk.tgz
+			fi
+			if [ ${TRASH_BACKUP} -eq 1 ];then
+	        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz
+			fi
 	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	        ((K = K+1))
 	        unset MAIL
@@ -488,8 +520,12 @@ incremental_accounts ()
         	                else
         	                        MAILHOST=$(grep ^zimbraMailHost $TEMPDIR/$MAIL.ldiff | awk '{print $2}')
         	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.tgz
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
-        	                        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
+									if [ ${SPAM_BACKUP} -eq 1 ];then
+        	                        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Junk.tgz
+									fi
+									if [ ${TRASH_BACKUP} -eq 1 ];then
+        	                        	$(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz\&query=after:\"$INCFROM\" > $TEMPDIR/$MAIL.Trash.tgz
+									fi
 	                                echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
                                 	((K = K+1))
 	                        fi
@@ -556,8 +592,12 @@ restore_accounts ()
                                 	else
                                         	MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')
 	                                        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-        	                                $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
-        	                                $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
+											if [ ${SPAM_BACKUP} -eq 1 ];then
+        	                                	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
+											fi
+											if [ ${TRASH_BACKUP} -eq 1 ];then
+        	                                	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
+											fi
         	                                ((K = K+1))
         	                                unset MAIL
                                 	fi
@@ -591,8 +631,12 @@ restore_on_box()
 					echo "Restoring from $SESSIONACCOUNT on $DEST"
 					MAILHOST=$(grep ^zimbraMailHost $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}')                                  	                                        	
 					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/?fmt=tgz
-					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Junk?fmt=tgz
-					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Trash?fmt=tgz
+					if [ ${SPAM_BACKUP} -eq 1 ];then
+						$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Junk?fmt=tgz
+					fi
+					if [ ${TRASH_BACKUP} -eq 1 ];then
+						$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$DEST/Trash?fmt=tgz
+					fi
 					echo "$MAIL restored from  $SESSIONACCOUNT on $DEST"
                                 done
                                 	unset MAIL
@@ -639,8 +683,12 @@ restore_LDAP_account ()
                                         	$(which ldapdelete) -r -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS $(grep ^dn: $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff | awk '{print $2}') 2>/dev/null
                                         	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
                                         	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
-                                        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
+											if [ ${SPAM_BACKUP} -eq 1 ];then
+                                        		$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz
+											fi
+											if [ ${TRASH_BACKUP} -eq 1 ];then
+                                        		$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz
+											fi
                                         	echo "$MAIL restored from  $SESSIONACCOUNT"
                                 	done
                                 	((K = K+1))
@@ -685,15 +733,19 @@ restore_all_accounts_parallel ()
 	        	$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
 
 		        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &	
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
-		        $(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
+				if [ ${SPAM_BACKUP} -eq 1 ];then
+					$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
+				fi
+				if [ ${TRASH_BACKUP} -eq 1 ];then
+		        	$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
+				fi
 
 			echo "$MAIL restored"
 		else
 			until [ $STAT -lt $MAX_PARALLEL_PROCESS ]
 	                do
 	                        STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
-	                        sleep 5
+	                        sleep 3
 				#Número máximo de processos atingido ($STAT). Aguardando vaga."
 	                done
 		
@@ -708,8 +760,12 @@ restore_all_accounts_parallel ()
 			$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSIONACCOUNT/$MAIL.ldiff
 
 			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/?fmt=tgz &
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
-			$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
+			if [ ${SPAM_BACKUP} -eq 1 ];then
+				$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Junk.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Junk?fmt=tgz &
+			fi
+			if [ ${TRASH_BACKUP} -eq 1 ];then
+				$(which curl) -k --data-binary @$WORKDIR/$SESSIONACCOUNT/$MAIL.Trash.tgz -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz &
+			fi
 			echo "$MAIL restored"
 
 		fi
