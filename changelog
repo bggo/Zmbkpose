@@ -1,3 +1,30 @@
+zmbkpose (2.1)
+	* Modified zmbkpose.conf: 
+	zmbkpose.conf now make backup trash and junk folders by default.
+	
+	# Support to disable spam backup
+	#SPAM_BACKUP - 0 = off 1 = on 
+	SPAM_BACKUP=1
+	
+	# Support to disable trash backup
+	#TRASH_BACKUP - 0 = off 1 = on 
+	TRASH_BACKUP=1
+
+
+	* Modified functions: 
+	backup_all_accounts_parallel()	(added support to disable or enable backup trash and junk folders. Changed time check to start a parallel backup.)
+	backup_all_accounts()	(added support to disable or enable backup trash and junk folders)
+	incremental_all_accounts()	(added support to disable or enable backup trash and junk folders. Changed time check to start a parallel backup.)
+	backup_accounts()	(added support to disable or enable backup trash and junk folders)
+	incremental_accounts()	(added support to disable or enable backup trash and junk folders)
+	restore_accounts()	(added support to disable or enable restore trash and junk folders)
+	restore_on_box()	(added support to disable or enable restore trash and junk folders)
+	restore_LDAP_account()	(added support to disable or enable restore trash and junk folders)
+	restore_all_accounts_parallel()	(added support to disable or enable restore trash and junk folders. Changed time check to start a parallel restore)
+
+-- Rafael Mendonca <rafael.mendonca@4linux.com.br> Wed,17 12 2014 12:35:36 -0300
+
+
 zmbkpose (2.0)
 	* Added functions:  
 	backup_distribution_list()
