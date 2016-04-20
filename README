@@ -149,16 +149,21 @@ Index:
 04 - Usage instructions 
    -----------------------------------------------------------------------------
 
-   a) Set up your file /etc/zmbkpose/zmbkpose.conf
+   a) It is important to use the correct execution of zmbkpose user.
+      The install.sh script makes a comment about this.
+      Example from root, running zmbkpose with user zimbra:
+     # su - -c zimbra "zmbkpose -l"
 
-   b) Begins doing a full backup for specific accounts
+   b) Set up your file /etc/zmbkpose/zmbkpose.conf
+
+   c) Begins doing a full backup for specific accounts
     $ zmbkpose -f -a email1 
     You'll get a full backup copy in $WORKDIR/email1/
     You can make a conditional full backup only if the previous backup has 
 	 more than "time" old.
     $ zmbkpose -F time -a email1 
    
-   c) Perform incremental backups.
+   d) Perform incremental backups.
     $ zmbkpose -i -a email1 
     This does not make much sense. Try to do incremental backups only if the 
      previous backup is too old.
@@ -169,13 +174,13 @@ Index:
     If you have no previous full backup, you can use "-t" in the same command 
 	 to automatically run a full backup.
    
-   d) Programme incremental backups for all accounts, even during the hours of 
+   e) Programme incremental backups for all accounts, even during the hours of 
        user activity. They are lightweight. Try to limit by execution time 
        (-C time), number of accounts (-cn). Try also add delay between each 
 	   backup account (-e time).
     $ zmbkpose -I 30h -C 3h -e 5s
    
-   e) Delete old backups.  Assume the following example of account daily backup
+   f) Delete old backups.  Assume the following example of account daily backup
      day backup_type
      --- -----------
       1  FULL

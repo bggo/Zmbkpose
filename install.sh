@@ -43,12 +43,15 @@ ERR_NOBKPDIR="1"		# No backup directory could be found
 ERR_NOROOT="2"			# Script was run without root privileges
 ERR_DEPNOTFOUND="3"		# Missing dependency
 ERR_MISSINGFILES="4"		# Missing files
+ERR_NO_EXEC_USER="5"		# No user for zmbkpose execution
 
 function error(){ echo "ERROR: $@" ; }
 
 function item_check_msg(){ printf '%-40s...' "$@" ; }
 
-function sub_item_check_msg(){ printf '   %-37s...' "$@" ; }
+function item_msg(){ printf '  -%-40s\n' "$@" ; }
+
+function sub_item_check_msg(){ printf '  %-37s...' "$@" ; }
 
 function read_y_n_question(){
 	echo -n "$1 [y/n]: "
@@ -89,7 +92,8 @@ while [ -n "$1" ];do
 Zmbkpose installer script :
  install.sh [--zmbkdir dir] [--zmbkuser user]
    --zmbkdir  dir   :Configure "dir" as directory for mailbox backups
-   --zmbkuser user  :Configure install permissions for run zmbkpose by "user"
+   --zmbkuser user  :Configure user for execution of zmbkpose. Default is "zimbra" if 
+                       we are in a host with zimbra installed.
 	EOF
 			exit $ERR_OK
 		;;
@@ -139,12 +143,13 @@ fi
 # Check user for execute zmbkpose
 if [ -z "$ZMBKPOSE_USER" ];then
 	error "No user defined for zmbkpose execution. Please use --zmbkuser _user_"
-	exit $ERR_NOBKPDIR
+	exit $ERR_NO_EXEC_USER
 fi
 if ! grep -q "^$ZMBKPOSE_USER:" /etc/passwd ;then
 	error "User \"$ZMBKPOSE_USER\" doesn't exists"
-	exit $ERR_NOBKPDIR
+	exit $ERR_NO_EXEC_USER
 fi
+item_msg "zmbkpose will use \"$ZMBKPOSE_USER\" user for execution."
 
 #Zmbkpose backup dir check
 if [ -z $ZMBKPOSE_BKDIR ]; then
@@ -176,6 +181,7 @@ STATUS=0
 item_check_msg 'Checking system for dependencies...'; echo
 
 ## Dependencies:No zimbra dependent
+item_msg "Dependencies will be executed by \"$ZMBKPOSE_USER\" user"
 DEPS="awk curl date du egrep find grep ldapadd ldapdelete ldapsearch ln printf rm sed sort tar  uniq readlink"
 for dep_cmd in $DEPS;do
 	sub_item_check_msg "$dep_cmd"
@@ -277,6 +283,16 @@ cat<<-EOF
 
 ################################################################################
 	EOF
+
+# Remember user for zmbkpose execution
+cat<<-EOF
+
+Note: --------------------------------------------------------------------------
+ Remember execute zmbkpose using user "$ZMBKPOSE_USER", dependent commands 
+  were checked using this user. 
+--------------------------------------------------------------------------------
+	EOF
+
 if read_y_n_question "Install completed. Do you want to display the README file?" ;then
   less $MYDIR/README
 fi

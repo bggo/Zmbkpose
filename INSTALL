@@ -2,6 +2,14 @@
 
 To install zmbkpose just run the install.sh script.
 
+--------------------------------------------------------------------------------
+Note: It is important to determine the correct running zmbkpose user.
+The install.sh script uses the argument --zmbkuser to check dependencies 
+ necessary for its implementation.
+If you do not specify this option, the default value for it is "zimbra", and is
+ the best value if you are executing zmbkpose on zimbra host.
+--------------------------------------------------------------------------------
+
 # chmod +x install.sh
 # ./install.sh
 
