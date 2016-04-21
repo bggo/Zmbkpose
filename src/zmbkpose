@@ -747,11 +747,16 @@ function backup_account(){
 	if [ -z "$SIMULATE" ] ;then
 		zimbra_ldap_backup "$account" $ldap_bkf 
 		debug "$account - ldap backup complete"
+	else
+		debug "$account - skip ldap backup (simulation)"
 	fi
 
 	#Mailbox backup
 	debug "$account - Doing mailbox backup ..."
-	[ -z "$SIMULATE" ] || return 0 # Nothing else to do
+	if [ ! -z "$SIMULATE" ];then
+		debug "$account - skip mailbox backup (simulation)"
+		return 0 
+	fi
 	local mbox_bkf=${tmp_dir}/$MAILBOX_FILE_IN_TAR
 	# backup is dependent on the type of account
 	local ac_type;ac_type=$(cat $ldap_bkf|ldif_analysis_account_type $ldap_bkf) 
