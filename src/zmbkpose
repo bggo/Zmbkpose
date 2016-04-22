@@ -690,7 +690,7 @@ function backup_account(){
 	
 	#Temporary dir for generate files
 	if [ -z "$SIMULATE" ] ;then
-		tmp_dir=$(mktemp --tmpdir="${WORKDIR}" -d) 
+		tmp_dir=$($MKTEMP_cmd --tmpdir="${WORKDIR}" -d) 
 	fi
 
 	#Backup to WORKDIR
@@ -992,6 +992,7 @@ source $OSE_CONF/zmbkpose.conf
 [ -z "$FIND_cmd" ] && FIND_cmd=$(which find) || { no_command_error find; exit 1 ;}
 [ -z "$GREP_cmd" ] && GREP_cmd=$(which grep) || { no_command_error grep; exit 1 ;}
 [ -z "$LN_cmd" ] && LN_cmd=$(which ln) || { no_command_error ln; exit 1 ;}
+[ -z "$MKTEMP_cmd" ] && MKTEMP_cmd=$(which mktemp) || { no_command_error mktemp; exit 1 ;}
 [ -z "$PRINTF_cmd" ] && PRINTF_cmd=$(which printf) || { no_command_error printf; exit 1 ;}
 [ -z "$RM_cmd" ] && RM_cmd=$(which rm) || { no_command_error rm; exit 1 ;}
 [ -z "$SED_cmd" ] && SED_cmd=$(which sed) || { no_command_error sed; exit 1 ;}
