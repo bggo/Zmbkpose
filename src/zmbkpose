@@ -443,36 +443,6 @@ function convert_account_to_structure(){
 }
 
 #
-## Create a uniq file or directory (mktemp is avoided by implementation differences)
-function l_mktemp(){
-	local dir="$1"
-	local fid="${2:-1}"
-	local ending="$3"
-	local el_type=${4:-f} #f:file d:directory
-	local msg=""
-	local max_wait_sec=6
- 	local start_tt=$(time_cur_tt)
-
-	#Locking for create element
-	while ! msg=$(mkdir $dir/lock 2>&1) ;do 
-		[ "$(( $(time_cur_tt) - $start_tt ))" -gt $max_wait_sec ] && \
-			echo $msg >&2 && return 1 
-		sleep 1
-	done
-
-	while [ -f $dir/${fid}${ending} -o -d $dir/${fid}${ending} ];do let fid++ ;done
-	if [ $el_type = d ];then
-		mkdir $dir/${fid}${ending}
-	else
-		touch $dir/${fid}${ending}
-	fi
-
-	#Release lock
-	rm -rf $dir/lock
-	echo $dir/${fid}${ending}
-}
-
-#
 ## Get files from backup account
 function get_backups_account(){
 	local account="$1"
@@ -706,6 +676,7 @@ function get_accounts_in_order_of_need_backup(){
 	echo $accounts_without_bk $accounts_in_storage
 }
 
+
 #
 ## Do a backup account
 function backup_account(){
@@ -719,14 +690,17 @@ function backup_account(){
 	
 	#Temporary dir for generate files
 	if [ -z "$SIMULATE" ] ;then
-		tmp_dir=$(l_mktemp ${WORKDIR} '' '' d)
+		tmp_dir=$(mktemp --tmpdir="${WORKDIR}" -d) 
 	fi
 
 	#Backup to WORKDIR
 	if [ -z "$backup_file" -a -z "$SIMULATE" ];then 
 		[ -d "$user_bk_dir" ] || mkdir -p "$user_bk_dir"
-		backup_file=$(l_mktemp \
-			$user_bk_dir $(time_cur_date_time_mark) ":$mode.tar")
+		backup_file="$user_bk_dir/$(time_cur_date_time_mark):$mode.tar"
+		until ( set -o noclobber; { > $backup_file ; } &> /dev/null );do
+			sleep 1
+			backup_file="$user_bk_dir/$(time_cur_date_time_mark):$mode.tar"
+		done
 	elif [ -f "$backup_file" ];then 
 			error "File: \"$backup_file\", already exists."
 			return 1
