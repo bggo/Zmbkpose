@@ -1,0 +1,29 @@
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/tmp
+
+##FULL BACKUPS every day for 400 accounts(-c 400), or for 6 hours(-C 6h)
+#  whichever comes first, only if last full backup has more than 20 days 
+#  old(-F 20d). 
+# Pause of 5 seconds between accounts backups( -e 5s)
+0 0 * * * zimbra LOG_TYPE=full_bk /usr/local/bin/zmbkpose.wrapper -F 20d -C 6h -c 400 -e 5s
+
+##INCREMENTAL BACKUPS every day for 3 hours(-C 3h), only if last incremental backup 
+# has more than 30hs old(-I 30h). 
+# Perform a full backup is not has previous incremental (-t)
+# Pause of 5 seconds betwee accounts backups (-e 5s)
+0 6  * * * zimbra LOG_TYPE=inc_bk /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -t -e 5s
+0 9  * * * zimbra LOG_TYPE=inc_bk /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -t -e 5s
+0 18 * * * zimbra LOG_TYPE=inc_bk /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -t -e 5s
+0 21 * * * zimbra LOG_TYPE=inc_bk /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -t -e 5s
+
+#Remove old backups
+#Delete cycles off backups older than 15 days(-d 15d). A cycle is a full backups
+#  and its subsequent incremental backups. 
+# zmbkpose will not eliminate backups leaving incomplete cycles
+0 2 * * *  zimbra LOG_TYPE=del_bk /usr/local/bin/zmbkpose.wrapper -d 15d
+
+#Remove old logs files
+0 22 * * * zimbra find /var/log/zmbkpose -type f -mtime +30 -exec rm -f '{}' \;
+-

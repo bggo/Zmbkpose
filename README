@@ -90,7 +90,7 @@ Index:
 
 
 01 - How zmbkpose obtains data for backups?
-   -----------------------------------------------------------------------------
+   =============================================================================
    - Using import/export feature released in Zimbra ZCS 5.0.12 version, zmbkpose
      get backups data via http (using curl) in tar-gzip format as follow:
 
@@ -110,7 +110,7 @@ Index:
 
 
 02 - How are backups stored?
-   -----------------------------------------------------------------------------
+   =============================================================================
    - The value of $WORKDIR variable in your /etc/zmbkpose.conf determine the root 
     directory for backups. 
    - In the WORKDIR directory, zmbkpose, create a directory for each account that has
@@ -132,7 +132,7 @@ Index:
 
 
 03 - Which is the backup content?
-   -----------------------------------------------------------------------------
+   =============================================================================
    Inside of the tar file described in "How are backups stored?" :
 
    - acct.ldif file, save ldap data for create the account. The data covers:
@@ -147,23 +147,18 @@ Index:
      
 
 04 - Usage instructions 
-   -----------------------------------------------------------------------------
+   =============================================================================
 
-   a) It is important to use the correct execution of zmbkpose user.
-      The install.sh script makes a comment about this.
-      Example from root, running zmbkpose with user zimbra:
-     # su - -c zimbra "zmbkpose -l"
+   a) Set up your file /etc/zmbkpose/zmbkpose.conf
 
-   b) Set up your file /etc/zmbkpose/zmbkpose.conf
-
-   c) Begins doing a full backup for specific accounts
+   b) Begins doing a full backup for specific accounts
     $ zmbkpose -f -a email1 
     You'll get a full backup copy in $WORKDIR/email1/
     You can make a conditional full backup only if the previous backup has 
 	 more than "time" old.
     $ zmbkpose -F time -a email1 
    
-   d) Perform incremental backups.
+   c) Perform incremental backups.
     $ zmbkpose -i -a email1 
     This does not make much sense. Try to do incremental backups only if the 
      previous backup is too old.
@@ -174,13 +169,13 @@ Index:
     If you have no previous full backup, you can use "-t" in the same command 
 	 to automatically run a full backup.
    
-   e) Programme incremental backups for all accounts, even during the hours of 
+   d) Programme incremental backups for all accounts, even during the hours of 
        user activity. They are lightweight. Try to limit by execution time 
        (-C time), number of accounts (-cn). Try also add delay between each 
 	   backup account (-e time).
     $ zmbkpose -I 30h -C 3h -e 5s
    
-   f) Delete old backups.  Assume the following example of account daily backup
+   e) Delete old backups.  Assume the following example of account daily backup
      day backup_type
      --- -----------
       1  FULL
@@ -201,7 +196,7 @@ Index:
      $ zmbkpose -a account -d 4d: not will delete any backup.
 
 05 - Usage recommendations 
-   -----------------------------------------------------------------------------
+   =============================================================================
 
    * I recommend doing full backups during the night and incremental backups
      throughout the day.
@@ -222,85 +217,30 @@ Index:
 
 
 06 - Usage example 
-   -----------------------------------------------------------------------------
-
+   =============================================================================
 
   It is my backup setup in a linux machine with 2400 Zimbra accounts, and 30 hours 
    (approx.) maximum time for each account without backup.
 
-  * A wrapper script /usr/local/bin/zmbkpose.wrapper for stdout loggin redirection:
---------------------------------------------------------------------------------
-#!/bin/bash
+  * A wrapper script for stdout/stderr log redirections in 
+     ./example/usr/local/bin/zmbkpose.backup.wrapper 
+    This script write a log file in /var/log/zmbkpose in every execution 
 
-#Full or incremental?
-unset mode
-[ -z "$mode" ] && echo -- "$@"|egrep -q '\W(-f|-F)\W' && mode="${mode}FULL."
-[ -z "$mode" ] && echo -- "$@"|egrep -q '\W(-i|-I)\W' && mode="${mode}INC."
-
-#Log file
-LOG_FILE=/var/log/zmbkpose/$(/bin/date '+%Y.%m.%d_%H.%M.%S').${mode}backup.log
-
-/usr/local/bin/zmbkpose $@ >$LOG_FILE 2>&1
---------------------------------------------------------------------------------
-
-  * A wrapper script /usr/local/bin/zmbkpose.rotate.wrapper for maintenance, and
-   stdout loggin redirection:
---------------------------------------------------------------------------------
-#!/bin/bash
-
-#Log file
-LOG_FILE=/var/log/zmbkpose/$(/bin/date '+%Y.%m.%d_%H.%M.%S').rotate.log
-
-#Delete backups older than ( now - time).  See "time FORMAT" below.
-# !!! Files are never deleted leaving inconsistent backups !!!
-
-TIME_TO_KEEP_BACKUPS=15d
-
-/usr/local/bin/zmbkpose -d $TIME_TO_KEEP_BACKUPS >$LOG_FILE 2>&1
---------------------------------------------------------------------------------
-
-  * A cron file /etc/cron.d/zimbra_mail_backup 
---------------------------------------------------------------------------------
-SHELL=/bin/bash
-PATH=/sbin:/bin:/usr/sbin:/usr/bin
-MAILTO=root
-HOME=/
-LOG_FILE=$(/bin/date '+%Y.%m.%d_%H.%M.%S').log
-
-##FULL Backups
-0 0 * * * backupmail /usr/local/bin/zmbkpose.wrapper -F 20d -C 6h -c 400 -e 5s
-##INC Backups
-0 6  * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
-0 9  * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
-0 18 * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
-0 21 * * * backupmail /usr/local/bin/zmbkpose.wrapper -I 30h -C 3h -e 5s
-
-#Remove old backups
-0 2 * * * backupmail /usr/local/bin/zmbkpose.rotate
-
-#Remove old logs
-0 22 * * * backupmail find /var/log/zmbkpose -type f -mtime +30 -exec ls '{}' \;
---------------------------------------------------------------------------------
-
+  * A cron job executing the before wraper in 
+     ./example/etc/cron.d/zimbra_mail_backup 
+    This job run :
+     - Full backups 
+     - Incremental backups
+     - Delete old backups
+     - Delete old logs files
 
 07 - Restore
-   -----------------------------------------------------------------------------
+   =============================================================================
 
   The restoration is on the mail account in which the backup was performed.
   There is no option to restore to another account. At least for now.
   This means that if you restore to an existing account, then this will be
     completed with the emails that are in the backup, and do not exist in the 
     account.
-
-  If you do not want this, my suggestion is that:
-   1) rename the account from the administration panel zimbra
-   2) restore the backup. This will create the email account with the original 
-       name again.
-   3) The user enters the account restored, search emails interest group them
-       in a folder and perform backup of that folder from the account 
-       preferences.
-   4) delete the account restored
-   5) rename the account from step 1 post to its original name
-   6) The user enters the email account, and import from zimbra preferences, 
-       backup done previously with the emails of interest in step 3.
+  If the account does not exist, this will be created.
 

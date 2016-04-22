@@ -44,7 +44,17 @@ OSE_CONF="/etc/zmbkpose"
 show_help ()
 {
 	cat<<-EOF 
- Options:
+ Actions:
+    -f              Full backup
+    -F time         Conditional full backup. If last full backup is "time" old
+    -i              Incremental backup
+    -I time         Conditional inc. backup. If last inc backup is "time" old
+    -r              Restore accounts from last full and later incrementals
+    -R time         Restore accounts up to the point in cycle reached by now-time
+    -d time         Delete old backups, if them are "time" old
+    -l,-m,-n        List all backups info(-l), only first backup(-m) or last(-n)
+
+ Options for actions:
     -a act[,act]... Operates on specific accounts. Default all.
     --admuser user  Use \"user\" as admin user for access to mailboxes
     --admpw pw      Use \"pw\" as admin user password for access to mailboxes
@@ -53,22 +63,14 @@ show_help ()
     -chldaph        In the restore in a different host, try to change some 
                      attributes of LDAP for account work
     -C time         Similar to "-c", backups up to reach the time "time"
-    -d time         Delete old backups, if them are "time" old
     -e time         Wait a time between each backup of an account
-    -f              Full backup
-    -F time         Conditional full backup. If last full backup is "time" old
     -h              This help
-    -i              Incremental backup
-    -I time         Conditional inc. backup. If last inc backup is "time" old
     --ldaph host    Use "host" as ldap master server (if you restore in 
 	                  another host, use --chldaph arg.)
     --ldapdn dn     Use "dn" for login to ldap server
     --ldappw pw     Use "pw" as password for login to ldap server
-    -l,-m,-n        List all backups info(-l), only first backup(-m) or last(-n)
     -p n            Backups in parallel, with a maximum of "n" instances
-    -r              Restore accounts from last full and later incrementals
     --rf file       Restore from a specific tar backup file 
-    -R time         Restore accounts up to the point in cycle reached by now-time
     -s              Simulation of operations as if they really do
     -t              On incremental backup, do full is not previous incremental
     -u              On failure of a backup account, does not stop.

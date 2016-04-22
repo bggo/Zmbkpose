@@ -1,0 +1,62 @@
+#!/bin/bash
+################################################################################
+# Wrapper for zmbkpose redirecting stdout/stderr to session log file
+#
+#----------------------------------------------------------------------
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of version 2 of the GNU General Public
+# License as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+# USA
+#----------------------------------------------------------------------
+
+################################################################################
+
+#--Configs
+ LOG_DIR=/var/log/zmbkpose
+
+#--Requires
+ [ -z "$DATE_cmd" ] && DATE_cmd=$(which date) || { no_command_error date; exit 1 ;}
+
+#--Stop if error
+ set -e
+
+#--Define log file
+ #-Check log dir
+ if [ ! -d "$LOG_DIR" ];then
+	echo "Error: Please create directory $LOG_DIR, with write permissions for user \"$(/bin/id -un)\""
+	exit 1
+ fi
+
+ #-Define a log type for use in lof file name
+ if [ -z "$LOG_TYPE" ];then
+	#if the arguments indicate that a full backup is performed
+	if echo -- "$@"|egrep -q '\W(-f|-F)\W' ;then
+		LOG_TYPE=full_bk
+	elif echo -- "$@"|egrep -q '\W(-i|-I)\W' ;then
+		LOG_TYPE=inc_bk
+	elif echo -- "$@"|egrep -q '\W-d\W' ;then
+		LOG_TYPE=del_bk
+	else
+		LOG_TYPE=undef
+	fi
+ fi
+ #-Create unique log file
+ LOG_FILE=$(mktemp --tmpdir="$LOG_DIR" "$(/bin/date '+%Y.%m.%d_%H.%M.%S').${LOG_TYPE}.XXX.log")
+
+#--Zimbra rc shell if I am zimbra user
+ if [ $(id -un) = zimbra -a -f /opt/zimbra/.bashrc ];then
+	source /opt/zimbra/.bashrc
+ fi
+
+#--Run
+/usr/local/bin/zmbkpose $@ >$LOG_FILE 2>&1
+
