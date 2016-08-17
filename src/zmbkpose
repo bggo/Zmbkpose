@@ -783,6 +783,7 @@ rotate_backup ()
 ###### MAIN ############
 # Here the code loads the config file
 source /etc/zmbkpose/zmbkpose.conf
+source /opt/zimbra/.bashrc
 
 if ! [ -z "$BACKUPUSER" ]; then
 	if [ "$(id -u)" != "$(id -u $BACKUPUSER)" ]; then
