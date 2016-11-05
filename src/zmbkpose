@@ -143,7 +143,7 @@ notify_email()
 	session=$2;
 	du -h $WORKDIR/$session/* > /tmp/list-$session ;
 	total=$(du -h $WORKDIR/$session | awk {'print $1'});
-	(echo "Subject: Backup $TIPO completed on $(date)";echo "Backup $TIPO completed on $(date)";echo -e "\r\nTotal: $total ";echo "Summary of files:"; cat /tmp/list-$session) | /opt/zimbra/postfix/sbin/sendmail $EMAIL_NOTIFY
+	(echo "Subject: Backup $TIPO completed on $(date)";echo "Backup $TIPO completed on $(date)";echo -e "\r\nTotal: $total ";echo "Summary of files:"; cat /tmp/list-$session) | /opt/zimbra/common/sbin/sendmail $EMAIL_NOTIFY
 }
 
 #This functions realize backup of distribution list
