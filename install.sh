@@ -39,11 +39,20 @@ ERR_OK="0"			# No error (normal exit)
 ERR_NOBKPDIR="1"		# No backup directory could be found
 ERR_NOROOT="2"			# Script was run without root privileges
 ERR_DEPNOTFOUND="3"		# Missing dependency
+ERR_NOZIBRAUSER="4"	# Missing zimbra user
+ERR_MISSINGFILES="5"	# Missing files
+
+if ! id -u $ZIMBRA_USER > /dev/null 2>&1; then
+	echo "No '$ZIMBRA_USER' user exists, either Zimbra is not installed or uses a non standard username."
+    echo "If the latter, please edit $0 and change the ZIBRA_USER variable."
+	exit $ERR_NOZIBRAUSER
+fi
+    
 
 # Try to guess missing settings as best as we can
-test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - zimbra -c zmhostname`
+test -z $ZIMBRA_HOSTNAME && ZIMBRA_HOSTNAME=`su - $ZIMBRA_USER -c zmhostname`
 test -z $ZIMBRA_ADDRESS  && ZIMBRA_ADDRESS=`grep $ZIMBRA_HOSTNAME /etc/hosts|awk '{print $1}'`
-test -z $ZIMBRA_LDAPPASS && ZIMBRA_LDAPPASS=`su - zimbra -c "zmlocalconfig -s zimbra_ldap_password"|awk '{print $3}'`
+test -z $ZIMBRA_LDAPPASS && ZIMBRA_LDAPPASS=`su - $ZIMBRA_USER -c "zmlocalconfig -s zimbra_ldap_password"|awk '{print $3}'`
 if [ -z $ZIMBRA_BKPDIR ]; then
 	test -d $ZIMBRA_DIR/backup && ZIMBRA_BKPDIR=$ZIMBRA_DIR/backup
 	test -d /backup && ZIMBRA_BKPDIR=/backup
@@ -163,6 +172,10 @@ if ! [ $STATUS = 0 ]; then
 	echo ""
 	echo "You're missing some dependencies OR they are not on $ZIMBRA_USER's PATH."
 	echo "Please correct the problem and run the installer again."
+    case "`lsb_release -i`" in
+        Ubuntu|ubuntu) echo -e "Deps can be fixed with the following command: \n\tapt-get install curl grep coreutils";;
+        RedHat|redhat|CentOS|centos) echo -e "Deps can be fixed with the following command: \n\tyum install curl [..]";; # FIXME don't know centos packages
+    esac
 	exit $STATUS
 fi
 # Done checking deps
