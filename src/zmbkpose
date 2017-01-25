@@ -216,6 +216,7 @@ backup_all_accounts_parallel()
 
 	        fi
 	done
+	wait $(jobs -p)
 
 	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
 	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
@@ -246,6 +247,7 @@ backup_all_accounts ()
 	        $(which curl) -k -u $ADMINUSER:$ADMINPASS https://$MAILHOST:7071/home/$MAIL/Trash?fmt=tgz > $TEMPDIR/$MAIL.Trash.tgz &
 	        echo $SESSION:$MAIL:$(date +%m/%d/%y) >> $WORKDIR/sessions.txt
 	done
+	wait $(jobs -p)
 
 	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
 	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
@@ -314,6 +316,7 @@ backup_accounts_parallel ()
 		unset MAIL
         	sleep 1
 	done
+	wait $(jobs -p)
 
 
         
@@ -714,6 +717,7 @@ restore_all_accounts_parallel ()
 
 		fi
 	done
+	wait $(jobs -p)
 	
 	exit 0
 }
