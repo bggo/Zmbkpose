@@ -88,7 +88,6 @@ echo "Usage:
 
 "
 # TODO Implements a hidden "Disaster Recovery" option + confirmations
-exit 0 
 }
 
 
@@ -131,7 +130,6 @@ echo "Usos:
 
 "
 # TODO: Deixar uma opção de "Disaster Recovery" oculta + confirmações
-exit 0
 }
 
 
@@ -334,16 +332,16 @@ backup_accounts_parallel ()
 incremental_all_accounts ()
 {
 
-	FULLSESSIONLABEL=$(grep "SESSION: full-" $WORKDIR/sessions.txt | tail -1 | awk '{print $2}')
+	FULLSESSIONLABEL=$(grep "SESSION: full-" $WORKDIR/sessions.txt 2>/dev/null | tail -1 | awk '{print $2}')
 	
 	if ! [ -z "$FULLSESSIONLABEL" ]; then
         	if ! [ -d "$WORKDIR/$FULLSESSIONLABEL" ]; then
         	        echo "Directory $WORKDIR/$FULLSESSIONLABEL doesn't exist. Impossible to continue."
-        	        exit 0
+	                exit 1
         	fi
 	else
         	echo "No full backup found. Impossible to continue."
-        	exit 0
+	        exit 1
 	fi
 
 
@@ -512,7 +510,7 @@ incremental_accounts ()
 
 list_sessions ()
 {
-	egrep 'SESSAO:|SESSION:' $WORKDIR/sessions.txt| egrep 'iniciada|started' |  awk '{print $2}' | sort | uniq  #egrep for with OR, for previosly compatibility
+	egrep 'SESSAO:|SESSION:' $WORKDIR/sessions.txt 2>/dev/null | egrep 'iniciada|started' |  awk '{print $2}' | sort | uniq  #egrep for with OR, for previosly compatibility
 	exit 0
 }
 
@@ -531,7 +529,7 @@ restore_accounts ()
 	                break
 	        fi
 
-	        grep $MAIL $WORKDIR/sessions.txt | grep -v ^WARN: > $BKPSACCOUNT
+	        grep $MAIL $WORKDIR/sessions.txt 2>/dev/null | grep -v ^WARN: > $BKPSACCOUNT
 
 	        if ! [ -s $BKPSACCOUNT ]; then
 	                echo "$MAIL: No backup found. Impossible to restor"
@@ -580,10 +578,10 @@ restore_on_box()
 
 	        if [ -n $DEST ]; then
 
-			grep $MAIL $WORKDIR/sessions.txt | grep -e ^inc- -e ^full- > $BKPSACCOUNT
+			grep $MAIL $WORKDIR/sessions.txt 2>/dev/null | grep -e ^inc- -e ^full- > $BKPSACCOUNT
 			if ! [ -s $BKPSACCOUNT ]; then
 	               		echo "$MAIL: No backup found. Impossible to restore."
-	                	exit 1
+	                        exit 1
 	                else
 	                	echo "Sessions found $(cat $BKPSACCOUNT | awk -F: '{print $1}')"
 				
@@ -627,7 +625,7 @@ restore_LDAP_account ()
 	                        echo "Account $MAIL exists. Use zmbkpose -r $MAIL SESSION_name."
 	                        ((K = K+1))
 	                else
-	                        grep $MAIL $WORKDIR/sessions.txt | grep -e ^inc- -e ^full- > $BKPSACCOUNT
+	                        grep $MAIL $WORKDIR/sessions.txt 2>/dev/null | grep -e ^inc- -e ^full- > $BKPSACCOUNT
 	                        if ! [ -s $BKPSACCOUNT ]; then
 	                                echo "$MAIL: No backup found. Impossible to restore."
 	                                ((K = K+1))
@@ -648,7 +646,7 @@ restore_LDAP_account ()
                         	fi
                 	fi
         	else
-                	SESSIONACCOUNT=$(grep $2 $WORKDIR/sessions.txt | grep $MAIL | tail -1 | awk -F: '{print $1}')
+                	SESSIONACCOUNT=$(grep $2 $WORKDIR/sessions.txt 2>/dev/null | grep $MAIL | tail -1 | awk -F: '{print $1}')
                 	if [ -z $SESSIONACCOUNT ]; then
                 	        echo "$MAIL: Session $2 doesn't exist or account not present. Impossible to restore."
                 	        ((K = K+1))
@@ -669,7 +667,7 @@ restore_LDAP_account ()
 
 restore_all_accounts_parallel ()
 {
-	for BKP in $(grep -e ^full- -e ^inc- $WORKDIR/sessions.txt); do
+	for BKP in $(grep -e ^full- -e ^inc- $WORKDIR/sessions.txt 2>/dev/null); do
 		STAT=$(ps aux | grep -i curl | grep -v grep| wc -l)
 	
 		if [ $STAT -lt $MAX_PARALLEL_PROCESS ];then
@@ -721,7 +719,7 @@ restore_all_accounts_parallel ()
 
 restore_alias()
 {
-	for BKP in $(grep -e "^alias-"  $WORKDIR/sessions.txt); do
+	for BKP in $(grep -e "^alias-"  $WORKDIR/sessions.txt 2>/dev/null); do
 		SESSAOCONTA=$(echo $BKP | awk -F: '{print $1}')
 		MAIL=$(echo $BKP | awk -F: '{print $2}')
 		$(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff	
@@ -731,7 +729,7 @@ restore_alias()
 
 restore_distribution_list()
 {
-        for BKP in $(grep -e "^distlist-"  $WORKDIR/sessions.txt); do
+        for BKP in $(grep -e "^distlist-"  $WORKDIR/sessions.txt 2>/dev/null); do
                 SESSAOCONTA=$(echo $BKP | awk -F: '{print $1}')
                 MAIL=$(echo $BKP | awk -F: '{print $2}')
                 $(which ldapadd) -x -H $LDAPMASTERSERVER -D $LDAPZIMBRADN -c -w $LDAPZIMBRAPASS -f $WORKDIR/$SESSAOCONTA/$MAIL.ldiff
@@ -766,12 +764,12 @@ exit 0
 
 rotate_backup ()
 {
-	cp $WORKDIR/sessions.txt $WORKDIR/sessions.txt.old
+	cp $WORKDIR/sessions.txt $WORKDIR/sessions.txt.old 2>/dev/null
 
-	grep SESS $WORKDIR/sessions.txt | awk '{print $2}'| while read line; do
+	grep SESS $WORKDIR/sessions.txt 2>/dev/null | awk '{print $2}'| while read line; do
 		if [ "$(echo ${line} | cut -d- -f2)" -lt "$1" ]; then
 		   [ -d $WORKDIR/"${line}" ] && rm -rf $WORKDIR/"${line}" && echo Exclude session "${line}"
-		   grep -v "${line}" $WORKDIR/sessions.txt > $WORKDIR/.sessions.txt
+		   grep -v "${line}" $WORKDIR/sessions.txt 2>/dev/null > $WORKDIR/.sessions.txt
 		   mv $WORKDIR/.sessions.txt $WORKDIR/sessions.txt
 		fi
 	done
@@ -782,56 +780,61 @@ rotate_backup ()
 
 ###### MAIN ############
 # Here the code loads the config file
-source /etc/zmbkpose/zmbkpose.conf
+CONF="/etc/zmbkpose/zmbkpose.conf"
+if [ ! -f "$CONF" ]; then
+	echo "No config file $CONF found! You need to run install.sh"
+	exit 1
+fi
+source $CONF
 
 if ! [ -z "$BACKUPUSER" ]; then
 	if [ "$(id -u)" != "$(id -u $BACKUPUSER)" ]; then
 		echo "You need to be $BACKUPUSER to run this script"
-		exit 0
+		exit 1
 	fi
 else
 	echo "You need to define the variable BACKUPUSER"
-	exit 0
+	exit 1
 fi
 
 if ! [ -z "$WORKDIR" ]; then
         if ! [ -d "$WORKDIR" ]; then
                 echo "The directory $WORKDIR doesn't exist"
-                exit 0
+                exit 1
         fi
 else
         echo "You need to define the variable WORKDIR"
-        exit 0
+        exit 1
 fi
 
 if [ -z "$ADMINUSER" ]; then
         echo "You need to define the variable ADMINUSER"
-        exit 0
+        exit 1
 fi
 
 if [ -z "$ADMINPASS" ]; then
         echo "You need to define the variable ADMINPASS"
-        exit 0
+        exit 1
 fi
 
 if [ -z "$LDAPMASTERSERVER" ]; then
         echo "You need to define the variable LDAPMASTERSERVER"
-        exit 0
+        exit 1
 fi
 
 if [ -z "$LDAPZIMBRADN" ]; then
         echo "You need to define the variable LDAPZIMBRADN"
-        exit 0
+        exit 1
 fi
 
 if [ -z "$LDAPZIMBRAPASS" ]; then
         echo "You need to define the variable LDAPZIMBRAPASS"
-        exit 0
+        exit 1
 fi
 
 if [ -z "$LOGFILE" ]; then
         echo "You need to define the variable LOGFILE"
-        exit 0
+        exit 1
 fi
 
 # Criticize the parameters passed on the command line
@@ -851,6 +854,7 @@ case "$1" in
 		else
 			echo "Incorrect $@ params. Read --help."
 			show_help
+	                exit 1
 		fi
 	fi
 
@@ -864,6 +868,7 @@ case "$1" in
 		fi
 		echo "Incorrect $@ params. Read the --help."
         	show_help
+	        exit 1
 	fi
 ;;
 "-l" )
@@ -872,18 +877,21 @@ case "$1" in
 	else
                 echo "Incorrect $@ params. Read the --help."
                 show_help
+                exit 1
 	fi
 ;;
 "-r" )
         if [ -z "$2" ]; then
                 echo "Incorrect $@ params. Read the --help."
                 show_help
+                exit 1
 	else
 		if [ -z "$4" ]; then
 			restore_accounts $2 $3
 		else
                 	echo "Incorrect $@ params. Read the --help."
 	                show_help
+	                exit 1
 		fi
 	fi
 ;;
@@ -891,6 +899,7 @@ case "$1" in
         if [ -z "$2" ]; then
                 echo "Incorrect $@ params. Read the --help."
                 show_help
+                exit 1
 	else
 		if [ -z "$3" ]; then
 			restore_LDAP_account $2
@@ -900,6 +909,7 @@ case "$1" in
 			else
 	                	echo "Incorrect $@ params. Read the --help."
 		                show_help
+	                        exit 1
 			fi
 		fi
 	fi
@@ -929,7 +939,7 @@ case "$1" in
 	if [ -z "$2" ]; then
 	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
 		show_help
-		exit 0
+	        exit 1
 	fi
 	if [ $2 -eq $2 2> /dev/null ]; then
 		if [ -z "$3" ]; then
@@ -945,7 +955,7 @@ case "$1" in
 			* )
 		          echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
          		  show_help
-			  exit 0
+	                  exit 1
 			;;
 			esac
 		fi
@@ -953,13 +963,14 @@ case "$1" in
 	else
 	        echo "Parameter -d accepts only number of days, or a number followed by weeks or months"
 		show_help
-		exit 0
+	        exit 1
 	fi
 ;;
 
 * )
 	echo "Incorrect parameters $@. See help."
 	show_help
+	exit 1
 ;;
 esac
 exit 0
