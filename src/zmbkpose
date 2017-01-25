@@ -216,6 +216,7 @@ backup_all_accounts_parallel()
 
 	        fi
 	done
+	wait $(jobs -p)
 
 	mv "$TEMPDIR" "$WORKDIR/$SESSION" && rm -rf "$TEMPDIR"
 	echo "SESSION: $SESSION completed in $(date)" >> $WORKDIR/sessions.txt
