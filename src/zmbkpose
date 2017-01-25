@@ -967,6 +967,10 @@ case "$1" in
 	fi
 ;;
 
+"-h" )
+	show_help
+;;
+
 * )
 	echo "Incorrect parameters $@. See help."
 	show_help
