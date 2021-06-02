@@ -828,13 +828,15 @@ restore_account()
 	#I think deletion is not secure implement. Modifications based on the 
 	# differences will be quite a challenge. I need you!
 	debug "$account - Ldap restore started"
-	for dn in $(echo "$ldap_data" |ldif_analysis_get_att dn y);do
+	while read dn ;do
 		if ! ldap_dn_exists "$dn" ;then 
 			debug "$account - Adding ldap entry: $dn"
 			[ -z "$SIMULATE" ] && \
 				echo "$ldap_data"|ldif_analysis_get_entry "$dn" |ldap_add 
 		fi
-	done
+	done<<-DN_ENTRIES
+		$(echo "$ldap_data" |ldif_analysis_get_att dn y)
+	DN_ENTRIES
 
 	#Account type
 	local ac_type;ac_type=$(echo "$ldap_data"| ldif_analysis_account_type)
