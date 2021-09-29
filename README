@@ -36,6 +36,9 @@ Till now, zmbkpose provides
 ################################################################################
           This tool DOES NOT DO disaster recovery. 
           Only accounts is in backups
+
+          This tool works in a one server zimbra installation. DOES NOT SUPPORT
+            MULTI SERVER zimbra deployment.
 ################################################################################
 ################################################################################
 
