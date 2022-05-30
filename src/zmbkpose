@@ -56,6 +56,8 @@ show_help ()
 
  Options for actions:
     -a act[,act]... Operates on specific accounts. Default all.
+    -b              On backups (-f,-F,-i,-I) operates only on accts. stored in
+                     the same mbox server. Useful in a multi-server mbox deploy.
     --admuser user  Use \"user\" as admin user for access to mailboxes
     --admpw pw      Use \"pw\" as admin user password for access to mailboxes
     --bf file       Backup to a specific tar file(don't use WORKDIR). Use - for stdout
@@ -194,7 +196,11 @@ function ldap_test_server()
 ## Get accounts from ldap
 function ldap_get_accts()
 {
-	ldap_search "(objectclass=zimbraAccount)" "zimbraMailDeliveryAddress" \
+	local ldap_filter="objectclass=zimbraAccount"
+    if [ "$SAME_MBOX_SRV" = yes ];then
+		ldap_filter="&($ldap_filter)(zimbraMailHost=$($HOSTNAME_cmd))"
+	fi
+	ldap_search "($ldap_filter)" "zimbraMailDeliveryAddress" \
 		| $GREP_cmd ^zimbraMailDeliveryAddress | $AWK_cmd '{print $2}'
 }
 
@@ -207,8 +213,12 @@ function ldap_get_groups()
 	# an alias, these email too is saved in the "zimbraMailAlias" 
 	# attribute. This code try to implicate the "uid" attribute for 
 	# determine the correct mail value.
+	local ldap_filter="objectclass=zimbraDistributionList"
+	if [ "$SAME_MBOX_SRV" = yes ];then
+		ldap_filter="&($ldap_filter)(zimbraMailHost=$($HOSTNAME_cmd))"
+	fi
 	for dn in $(
-		ldap_search "(objectclass=zimbraDistributionList)" "dn"| $GREP_cmd '^dn:'| $AWK_cmd '{print $2}'
+		ldap_search "($ldap_filter)" "dn"| $GREP_cmd '^dn:'| $AWK_cmd '{print $2}'
 		);do
 		uid=$(ldap_search "(objectclass=*)" "uid" "$dn" |$GREP_cmd '^uid'|$AWK_cmd '{print $2}')
 		ldap_search "(objectclass=*)" "mail" "$dn" |$EGREP_cmd "^mail: *$uid@"|$AWK_cmd '{print $2}'
@@ -723,6 +733,15 @@ function backup_account(){
 	if [ -z "$SIMULATE" ] ;then
 		zimbra_ldap_backup "$account" $ldap_bkf 
 		debug "$account - ldap backup complete"
+		local mailhost; mailhost=$(cat $ldap_bkf|ldif_analysis_get_att zimbraMailHost)
+		[ -z "$mailhost" ] && \
+			debug "$account - No zimbraMailHost ldap attribute." && return 1
+
+		#Backup only accounts in the same mailbox server?
+		if [ "$SAME_MBOX_SRV" = yes ];then
+			[ $($HOSTNAME_cmd) = "$mailhost" ] ||
+				{ debug "$account - skipping backup. There is no stored in this mailbox servers." ; return 0 ;}
+		fi
 	else
 		debug "$account - skip ldap backup (simulation)"
 	fi
@@ -740,7 +759,7 @@ function backup_account(){
 		debug "$account - No a mail account. Skipping mailbox backup." 
 	else
 		#Mailbox backup
-		local mailhost;mailhost=$(cat $ldap_bkf|ldif_analysis_get_att zimbraMailHost)
+        local mailhost;mailhost=$(cat $ldap_bkf|ldif_analysis_get_att zimbraMailHost)
 		[ -z "$mailhost" ] && \
 			debug "$account - No zimbraMailHost ldap attribute." && return 1
 		[ -z "$SIMULATE" ] && { zimbra_mailbox_backup "$account" "$mailhost" \
@@ -995,6 +1014,7 @@ source $OSE_CONF/zmbkpose.conf
 [ -z "$EGREP_cmd" ] && EGREP_cmd=$(which egrep) || { no_command_error egrep; exit 1 ;}
 [ -z "$FIND_cmd" ] && FIND_cmd=$(which find) || { no_command_error find; exit 1 ;}
 [ -z "$GREP_cmd" ] && GREP_cmd=$(which grep) || { no_command_error grep; exit 1 ;}
+[ -z "$HOSTNAME_cmd" ] && HOSTNAME_cmd="$(which hostname) -f" || exit 1
 [ -z "$LN_cmd" ] && LN_cmd=$(which ln) || { no_command_error ln; exit 1 ;}
 [ -z "$MKTEMP_cmd" ] && MKTEMP_cmd=$(which mktemp) || { no_command_error mktemp; exit 1 ;}
 [ -z "$PRINTF_cmd" ] && PRINTF_cmd=$(which printf) || { no_command_error printf; exit 1 ;}
@@ -1013,6 +1033,10 @@ while [ -n "$1" ];do
 			[ -z "$2" ] && show_help && exit 
 			accounts=${2//,/ } #Multiple accounts comma separated
 			shift 2
+		;;
+		(-b) #On backups operates only on accts. stored in the same mbox server
+			SAME_MBOX_SRV=yes
+			shift 1
 		;;
 		(--admuser) #Mailbox admin user
 			[ -z "$2" ] && show_help && exit 
